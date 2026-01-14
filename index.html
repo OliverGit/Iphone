@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>GPS Tracker</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #1a1a1a;
+            color: #fff;
+            overflow: hidden;
+        }
+        
+        #map {
+            width: 100%;
+            height: 60vh;
+        }
+        
+        .stats {
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .stat-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .stat-label {
+            font-size: 12px;
+            opacity: 0.8;
+            margin-bottom: 5px;
+        }
+        
+        .stat-value {
+            font-size: 28px;
+            font-weight: bold;
+            line-height: 1.2;
+        }
+        
+        .stat-unit {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        
+        .accel-section {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .accel-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .accel-item {
+            text-align: center;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 10px;
+            border-radius: 8px;
+        }
+        
+        .accel-axis {
+            font-size: 12px;
+            opacity: 0.7;
+            margin-bottom: 5px;
+        }
+        
+        .accel-value {
+            font-size: 18px;
+            font-weight: bold;
+        }
+        
+        .btn {
+            width: 100%;
+            padding: 15px;
+            margin-top: 15px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn-start {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-start:active {
+            transform: scale(0.95);
+        }
+        
+        .status {
+            text-align: center;
+            padding: 10px;
+            font-size: 14px;
+            opacity: 0.8;
+        }
+        
+        .error {
+            background: #ff4444;
+            color: white;
+            padding: 15px;
+            text-align: center;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    
+    <div class="stats">
+        <div class="status" id="status">Appuyez sur Démarrer</div>
+        
+        <div class="stat-grid">
+            <div class="stat-card">
+                <div class="stat-label">Vitesse</div>
+                <div class="stat-value">
+                    <span id="speed">0</span>
+                    <span class="stat-unit">km/h</span>
+                </div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-label">Altitude</div>
+                <div class="stat-value">
+                    <span id="altitude">0</span>
+                    <span class="stat-unit">m</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="accel-section">
+            <div class="stat-label">Accélération (m/s²)</div>
+            <div class="accel-grid">
+                <div class="accel-item">
+                    <div class="accel-axis">X</div>
+                    <div class="accel-value" id="accelX">0.0</div>
+                </div>
+                <div class="accel-item">
+                    <div class="accel-axis">Y</div>
+                    <div class="accel-value" id="accelY">0.0</div>
+                </div>
+                <div class="accel-item">
+                    <div class="accel-axis">Z</div>
+                    <div class="accel-value" id="accelZ">0.0</div>
+                </div>
+            </div>
+        </div>
+        
+        <button class="btn btn-start" id="startBtn">Démarrer</button>
+    </div>
+    
+    <div id="error" class="error" style="display: none;"></div>
+
+    <script>
+        let map, marker, circle;
+        let watchId = null;
+        let isTracking = false;
+        
+        // Initialiser la carte
+        function initMap() {
+            map = L.map('map').setView([43.2951, -0.3708], 13);
+            
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors',
+                maxZoom: 19
+            }).addTo(map);
+        }
+        
+        // Mettre à jour la position sur la carte
+        function updateMap(lat, lon, accuracy) {
+            if (marker) {
+                marker.setLatLng([lat, lon]);
+                circle.setLatLng([lat, lon]);
+                circle.setRadius(accuracy);
+            } else {
+                marker = L.marker([lat, lon]).addTo(map);
+                circle = L.circle([lat, lon], {
+                    radius: accuracy,
+                    color: '#667eea',
+                    fillColor: '#667eea',
+                    fillOpacity: 0.2
+                }).addTo(map);
+            }
+            
+            map.setView([lat, lon], 16);
+        }
+        
+        // Gérer la géolocalisation
+        function startTracking() {
+            if (!navigator.geolocation) {
+                showError("La géolocalisation n'est pas supportée");
+                return;
+            }
+            
+            document.getElementById('status').textContent = 'Localisation en cours...';
+            
+            watchId = navigator.geolocation.watchPosition(
+                (position) => {
+                    const { latitude, longitude, altitude, speed, accuracy } = position.coords;
+                    
+                    updateMap(latitude, longitude, accuracy);
+                    
+                    // Mettre à jour la vitesse (convertir m/s en km/h)
+                    const speedKmh = speed ? (speed * 3.6).toFixed(1) : '0.0';
+                    document.getElementById('speed').textContent = speedKmh;
+                    
+                    // Mettre à jour l'altitude
+                    const alt = altitude ? altitude.toFixed(0) : '0';
+                    document.getElementById('altitude').textContent = alt;
+                    
+                    document.getElementById('status').textContent = 'GPS actif';
+                    hideError();
+                },
+                (error) => {
+                    let message = '';
+                    switch(error.code) {
+                        case error.PERMISSION_DENIED:
+                            message = "Accès GPS refusé. Autorisez l'accès dans les paramètres.";
+                            break;
+                        case error.POSITION_UNAVAILABLE:
+                            message = "Position indisponible";
+                            break;
+                        case error.TIMEOUT:
+                            message = "Délai d'attente dépassé";
+                            break;
+                    }
+                    showError(message);
+                },
+                {
+                    enableHighAccuracy: true,
+                    maximumAge: 0,
+                    timeout: 5000
+                }
+            );
+        }
+        
+        // Gérer l'accéléromètre
+        function startAccelerometer() {
+            if (typeof DeviceMotionEvent !== 'undefined') {
+                // Sur iOS 13+, demander la permission
+                if (typeof DeviceMotionEvent.requestPermission === 'function') {
+                    DeviceMotionEvent.requestPermission()
+                        .then(response => {
+                            if (response === 'granted') {
+                                listenToAccelerometer();
+                            } else {
+                                showError("Accès accéléromètre refusé");
+                            }
+                        })
+                        .catch(console.error);
+                } else {
+                    listenToAccelerometer();
+                }
+            } else {
+                showError("Accéléromètre non supporté");
+            }
+        }
+        
+        function listenToAccelerometer() {
+            window.addEventListener('devicemotion', (event) => {
+                if (event.accelerationIncludingGravity) {
+                    const x = event.accelerationIncludingGravity.x || 0;
+                    const y = event.accelerationIncludingGravity.y || 0;
+                    const z = event.accelerationIncludingGravity.z || 0;
+                    
+                    document.getElementById('accelX').textContent = x.toFixed(1);
+                    document.getElementById('accelY').textContent = y.toFixed(1);
+                    document.getElementById('accelZ').textContent = z.toFixed(1);
+                }
+            });
+        }
+        
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+        
+        function hideError() {
+            document.getElementById('error').style.display = 'none';
+        }
+        
+        function toggleTracking() {
+            const btn = document.getElementById('startBtn');
+            
+            if (!isTracking) {
+                startTracking();
+                startAccelerometer();
+                btn.textContent = 'Arrêter';
+                btn.style.background = '#ff4444';
+                isTracking = true;
+            } else {
+                if (watchId) {
+                    navigator.geolocation.clearWatch(watchId);
+                }
+                btn.textContent = 'Démarrer';
+                btn.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+                document.getElementById('status').textContent = 'Arrêté';
+                isTracking = false;
+            }
+        }
+        
+        // Initialisation
+        initMap();
+        document.getElementById('startBtn').addEventListener('click', toggleTracking);
+    </script>
+</body>
+</html>
