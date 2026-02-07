@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mes Tâches</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f5f5;
+            padding-bottom: 80px;
+        }
+
+        .header {
+            background: white;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .date-navigator {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .date-navigator button {
+            background: #f0f0f0;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        .date-navigator button:active {
+            background: #e0e0e0;
+        }
+
+        .current-date {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .today-btn {
+            background: #007AFF !important;
+            color: white !important;
+            font-size: 14px;
+            padding: 6px 12px !important;
+        }
+
+        .input-container {
+            display: flex;
+            gap: 10px;
+        }
+
+        .task-input {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+
+        .add-btn {
+            background: #007AFF;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+
+        .add-btn:active {
+            background: #0051D5;
+        }
+
+        .tasks-container {
+            padding: 20px;
+        }
+
+        .task-item {
+            background: white;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .task-checkbox {
+            width: 22px;
+            height: 22px;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        .task-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .task-text {
+            font-size: 16px;
+            color: #333;
+            word-break: break-word;
+        }
+
+        .task-time {
+            font-size: 12px;
+            color: #999;
+        }
+
+        .task-text.completed {
+            text-decoration: line-through;
+            color: #999;
+        }
+
+        .task-actions {
+            display: flex;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .edit-btn, .delete-btn {
+            background: none;
+            border: none;
+            font-size: 18px;
+            cursor: pointer;
+            padding: 4px;
+        }
+
+        .edit-btn {
+            color: #007AFF;
+        }
+
+        .delete-btn {
+            color: #FF3B30;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+
+        .empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+
+        .stats {
+            display: flex;
+            justify-content: space-between;
+            padding: 15px 20px;
+            background: white;
+            margin: 20px;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: 600;
+            color: #007AFF;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+            margin-top: 4px;
+        }
+
+        .edit-mode {
+            background: #f8f8f8;
+        }
+
+        .edit-input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #007AFF;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+
+        .save-btn {
+            background: #34C759;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .cancel-btn {
+            background: #8E8E93;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="date-navigator">
+            <button id="prevDay">◀</button>
+            <div>
+                <div class="current-date" id="currentDate"></div>
+                <button class="today-btn" id="todayBtn">Aujourd'hui</button>
+            </div>
+            <button id="nextDay">▶</button>
+        </div>
+        <div class="input-container">
+            <input type="text" class="task-input" id="taskInput" placeholder="Nouvelle tâche...">
+            <button class="add-btn" id="addBtn">+</button>
+        </div>
+    </div>
+
+    <div class="stats" id="stats">
+        <div class="stat-item">
+            <div class="stat-value" id="totalTasks">0</div>
+            <div class="stat-label">Total</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-value" id="completedTasks">0</div>
+            <div class="stat-label">Terminées</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-value" id="remainingTasks">0</div>
+            <div class="stat-label">Restantes</div>
+        </div>
+    </div>
+
+    <div class="tasks-container" id="tasksContainer"></div>
+
+    <script>
+        // État de l'application
+        let currentDate = new Date();
+        let tasks = {};
+        let editingTaskId = null;
+
+        // Charger les données depuis localStorage
+        function loadTasks() {
+            const saved = localStorage.getItem('dailyTasks');
+            if (saved) {
+                tasks = JSON.parse(saved);
+            }
+        }
+
+        // Sauvegarder les données dans localStorage
+        function saveTasks() {
+            localStorage.setItem('dailyTasks', JSON.stringify(tasks));
+        }
+
+        // Formater la date pour affichage
+        function formatDate(date) {
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            return date.toLocaleDateString('fr-FR', options);
+        }
+
+        // Obtenir la clé de date (YYYY-MM-DD)
+        function getDateKey(date) {
+            return date.toISOString().split('T')[0];
+        }
+
+        // Obtenir l'heure actuelle formatée
+        function getCurrentTime() {
+            return new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+        }
+
+        // Mettre à jour l'affichage de la date
+        function updateDateDisplay() {
+            document.getElementById('currentDate').textContent = formatDate(currentDate);
+        }
+
+        // Générer un ID unique
+        function generateId() {
+            return Date.now().toString(36) + Math.random().toString(36).substr(2);
+        }
+
+        // Calculer les statistiques
+        function updateStats() {
+            const dateKey = getDateKey(currentDate);
+            const dayTasks = tasks[dateKey] || [];
+            
+            const total = dayTasks.length;
+            const completed = dayTasks.filter(t => t.completed).length;
+            const remaining = total - completed;
+
+            document.getElementById('totalTasks').textContent = total;
+            document.getElementById('completedTasks').textContent = completed;
+            document.getElementById('remainingTasks').textContent = remaining;
+        }
+
+        // Afficher les tâches
+        function renderTasks() {
+            const dateKey = getDateKey(currentDate);
+            const dayTasks = tasks[dateKey] || [];
+            const container = document.getElementById('tasksContainer');
+
+            if (dayTasks.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📝</div>
+                        <div>Aucune tâche pour cette journée</div>
+                    </div>
+                `;
+                updateStats();
+                return;
+            }
+
+            container.innerHTML = dayTasks.map(task => {
+                if (editingTaskId === task.id) {
+                    return `
+                        <div class="task-item edit-mode">
+                            <input type="checkbox" class="task-checkbox" ${task.completed ? 'checked' : ''} disabled>
+                            <div class="task-content">
+                                <input type="text" class="edit-input" id="editInput-${task.id}" value="${task.text}">
+                                <div class="task-time">${task.time}</div>
+                            </div>
+                            <div class="task-actions">
+                                <button class="save-btn" onclick="saveEdit('${task.id}')">✓</button>
+                                <button class="cancel-btn" onclick="cancelEdit()">✕</button>
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                return `
+                    <div class="task-item">
+                        <input type="checkbox" class="task-checkbox" ${task.completed ? 'checked' : ''} 
+                               onchange="toggleTask('${task.id}')">
+                        <div class="task-content">
+                            <div class="task-text ${task.completed ? 'completed' : ''}">${task.text}</div>
+                            <div class="task-time">${task.time}</div>
+                        </div>
+                        <div class="task-actions">
+                            <button class="edit-btn" onclick="startEdit('${task.id}')">✏️</button>
+                            <button class="delete-btn" onclick="deleteTask('${task.id}')">🗑️</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            updateStats();
+        }
+
+        // Ajouter une tâche
+        function addTask() {
+            const input = document.getElementById('taskInput');
+            const text = input.value.trim();
+
+            if (text === '') return;
+
+            const dateKey = getDateKey(currentDate);
+            if (!tasks[dateKey]) {
+                tasks[dateKey] = [];
+            }
+
+            tasks[dateKey].push({
+                id: generateId(),
+                text: text,
+                completed: false,
+                time: getCurrentTime()
+            });
+
+            input.value = '';
+            saveTasks();
+            renderTasks();
+        }
+
+        // Basculer l'état d'une tâche
+        window.toggleTask = function(id) {
+            const dateKey = getDateKey(currentDate);
+            const task = tasks[dateKey].find(t => t.id === id);
+            if (task) {
+                task.completed = !task.completed;
+                saveTasks();
+                renderTasks();
+            }
+        };
+
+        // Commencer l'édition
+        window.startEdit = function(id) {
+            editingTaskId = id;
+            renderTasks();
+            const input = document.getElementById(`editInput-${id}`);
+            if (input) {
+                input.focus();
+                input.select();
+            }
+        };
+
+        // Sauvegarder l'édition
+        window.saveEdit = function(id) {
+            const input = document.getElementById(`editInput-${id}`);
+            const newText = input.value.trim();
+
+            if (newText === '') {
+                cancelEdit();
+                return;
+            }
+
+            const dateKey = getDateKey(currentDate);
+            const task = tasks[dateKey].find(t => t.id === id);
+            if (task) {
+                task.text = newText;
+                saveTasks();
+            }
+
+            editingTaskId = null;
+            renderTasks();
+        };
+
+        // Annuler l'édition
+        window.cancelEdit = function() {
+            editingTaskId = null;
+            renderTasks();
+        };
+
+        // Supprimer une tâche
+        window.deleteTask = function(id) {
+            if (!confirm('Supprimer cette tâche ?')) return;
+
+            const dateKey = getDateKey(currentDate);
+            tasks[dateKey] = tasks[dateKey].filter(t => t.id !== id);
+            
+            if (tasks[dateKey].length === 0) {
+                delete tasks[dateKey];
+            }
+
+            saveTasks();
+            renderTasks();
+        };
+
+        // Navigation entre les jours
+        function changeDay(offset) {
+            currentDate.setDate(currentDate.getDate() + offset);
+            updateDateDisplay();
+            editingTaskId = null;
+            renderTasks();
+        }
+
+        // Revenir à aujourd'hui
+        function goToToday() {
+            currentDate = new Date();
+            updateDateDisplay();
+            editingTaskId = null;
+            renderTasks();
+        }
+
+        // Événements
+        document.getElementById('addBtn').addEventListener('click', addTask);
+        document.getElementById('taskInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') addTask();
+        });
+        document.getElementById('prevDay').addEventListener('click', () => changeDay(-1));
+        document.getElementById('nextDay').addEventListener('click', () => changeDay(1));
+        document.getElementById('todayBtn').addEventListener('click', goToToday);
+
+        // Initialisation
+        loadTasks();
+        updateDateDisplay();
+        renderTasks();
+    </script>
+</body>
+</html>
