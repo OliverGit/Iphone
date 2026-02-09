@@ -5,9 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>GPS Tracker</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+    <title>GPS Tracker - Accélération</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
     <style>
         * {
             margin: 0;
@@ -16,321 +18,479 @@
         }
         
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            background: #1a1a1a;
-            color: #fff;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
             overflow: hidden;
+            height: 100vh;
+            width: 100vw;
         }
         
         #map {
-            width: 100%;
-            height: 60vh;
+            height: 100vh;
+            width: 100vw;
+            position: absolute;
+            top: 0;
+            left: 0;
         }
         
-        .stats {
-            padding: 20px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        }
-        
-        .stat-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 15px;
-            margin-top: 15px;
-        }
-        
-        .stat-card {
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            border-radius: 12px;
-            padding: 15px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-        }
-        
-        .stat-label {
-            font-size: 12px;
-            opacity: 0.8;
-            margin-bottom: 5px;
-        }
-        
-        .stat-value {
-            font-size: 28px;
-            font-weight: bold;
-            line-height: 1.2;
-        }
-        
-        .stat-unit {
-            font-size: 14px;
-            opacity: 0.9;
-        }
-        
-        .accel-section {
-            margin-top: 15px;
-            padding-top: 15px;
-            border-top: 1px solid rgba(255, 255, 255, 0.2);
-        }
-        
-        .accel-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
+        .controls {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            z-index: 1000;
+            display: flex;
             gap: 10px;
-            margin-top: 10px;
-        }
-        
-        .accel-item {
-            text-align: center;
-            background: rgba(255, 255, 255, 0.05);
-            padding: 10px;
-            border-radius: 8px;
-        }
-        
-        .accel-axis {
-            font-size: 12px;
-            opacity: 0.7;
-            margin-bottom: 5px;
-        }
-        
-        .accel-value {
-            font-size: 18px;
-            font-weight: bold;
+            flex-wrap: wrap;
         }
         
         .btn {
-            width: 100%;
-            padding: 15px;
-            margin-top: 15px;
+            background: white;
             border: none;
-            border-radius: 12px;
+            padding: 12px 20px;
+            border-radius: 8px;
             font-size: 16px;
-            font-weight: bold;
+            font-weight: 600;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
             cursor: pointer;
-            transition: all 0.3s;
+            transition: all 0.2s;
+            flex: 1;
+            min-width: 100px;
         }
         
-        .btn-start {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-        }
-        
-        .btn-start:active {
+        .btn:active {
             transform: scale(0.95);
         }
         
-        .status {
-            text-align: center;
-            padding: 10px;
-            font-size: 14px;
-            opacity: 0.8;
+        .btn.start {
+            background: #34C759;
+            color: white;
         }
         
-        .error {
-            background: #ff4444;
+        .btn.stop {
+            background: #FF3B30;
             color: white;
+        }
+        
+        .btn.clear {
+            background: #FF9500;
+            color: white;
+        }
+        
+        .info-panel {
+            position: absolute;
+            bottom: 20px;
+            left: 10px;
+            right: 10px;
+            background: rgba(255, 255, 255, 0.95);
             padding: 15px;
-            text-align: center;
+            border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+            z-index: 1000;
             font-size: 14px;
+        }
+        
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+        
+        .info-row:last-child {
+            margin-bottom: 0;
+        }
+        
+        .info-label {
+            font-weight: 600;
+            color: #666;
+        }
+        
+        .info-value {
+            font-weight: 700;
+            color: #000;
+        }
+        
+        .legend {
+            position: absolute;
+            top: 80px;
+            right: 10px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 12px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            z-index: 1000;
+            font-size: 12px;
+        }
+        
+        .legend-title {
+            font-weight: 700;
+            margin-bottom: 8px;
+            text-align: center;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+        
+        .legend-color {
+            width: 30px;
+            height: 4px;
+            margin-right: 8px;
+            border-radius: 2px;
+        }
+        
+        .status {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 20px 30px;
+            border-radius: 12px;
+            font-size: 16px;
+            text-align: center;
+            z-index: 2000;
+            display: none;
+        }
+        
+        .status.show {
+            display: block;
         }
     </style>
 </head>
 <body>
     <div id="map"></div>
     
-    <div class="stats">
-        <div class="status" id="status">Appuyez sur Démarrer</div>
-        
-        <div class="stat-grid">
-            <div class="stat-card">
-                <div class="stat-label">Vitesse</div>
-                <div class="stat-value">
-                    <span id="speed">0</span>
-                    <span class="stat-unit">km/h</span>
-                </div>
-            </div>
-            
-            <div class="stat-card">
-                <div class="stat-label">Altitude</div>
-                <div class="stat-value">
-                    <span id="altitude">0</span>
-                    <span class="stat-unit">m</span>
-                </div>
-            </div>
-        </div>
-        
-        <div class="accel-section">
-            <div class="stat-label">Accélération (m/s²)</div>
-            <div class="accel-grid">
-                <div class="accel-item">
-                    <div class="accel-axis">X</div>
-                    <div class="accel-value" id="accelX">0.0</div>
-                </div>
-                <div class="accel-item">
-                    <div class="accel-axis">Y</div>
-                    <div class="accel-value" id="accelY">0.0</div>
-                </div>
-                <div class="accel-item">
-                    <div class="accel-axis">Z</div>
-                    <div class="accel-value" id="accelZ">0.0</div>
-                </div>
-            </div>
-        </div>
-        
-        <button class="btn btn-start" id="startBtn">Démarrer</button>
+    <div class="controls">
+        <button id="startBtn" class="btn start">Démarrer</button>
+        <button id="stopBtn" class="btn stop" style="display:none;">Arrêter</button>
+        <button id="clearBtn" class="btn clear">Effacer</button>
     </div>
     
-    <div id="error" class="error" style="display: none;"></div>
-
+    <div class="legend">
+        <div class="legend-title">Accélération</div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #00FF00;"></div>
+            <span>Fort freinage (&lt; -2 m/s²)</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #90EE90;"></div>
+            <span>Freinage léger</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #FFFF00;"></div>
+            <span>Constant (≈ 0 m/s²)</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #FFA500;"></div>
+            <span>Accélération</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #FF0000;"></div>
+            <span>Forte accél. (&gt; 2 m/s²)</span>
+        </div>
+    </div>
+    
+    <div class="info-panel">
+        <div class="info-row">
+            <span class="info-label">Vitesse:</span>
+            <span class="info-value" id="speed">0 km/h</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Accélération:</span>
+            <span class="info-value" id="acceleration">0.0 m/s²</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Distance:</span>
+            <span class="info-value" id="distance">0 m</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Points:</span>
+            <span class="info-value" id="points">0</span>
+        </div>
+    </div>
+    
+    <div id="status" class="status"></div>
+    
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
     <script>
-        let map, marker, circle;
-        let watchId = null;
-        let isTracking = false;
+        // Configuration
+        const UPDATE_INTERVAL = 1000; // Mise à jour toutes les secondes
+        const MIN_DISTANCE = 5; // Distance minimale en mètres pour enregistrer un point
         
-        // Initialiser la carte
+        // Variables globales
+        let map;
+        let currentMarker;
+        let trackingActive = false;
+        let watchId = null;
+        let pathPoints = [];
+        let polylines = [];
+        let lastPosition = null;
+        let lastSpeed = 0;
+        let lastTimestamp = null;
+        let totalDistance = 0;
+        
+        // Initialisation de la carte
         function initMap() {
-            map = L.map('map').setView([43.2951, -0.3708], 13);
+            map = L.map('map', {
+                zoomControl: true,
+                attributionControl: true
+            }).setView([48.8566, 2.3522], 13); // Paris par défaut
             
+            // Couche OpenStreetMap
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '© OpenStreetMap contributors',
                 maxZoom: 19
             }).addTo(map);
+            
+            showStatus('Appuyez sur Démarrer pour commencer le suivi');
         }
         
-        // Mettre à jour la position sur la carte
-        function updateMap(lat, lon, accuracy) {
-            if (marker) {
-                marker.setLatLng([lat, lon]);
-                circle.setLatLng([lat, lon]);
-                circle.setRadius(accuracy);
-            } else {
-                marker = L.marker([lat, lon]).addTo(map);
-                circle = L.circle([lat, lon], {
-                    radius: accuracy,
-                    color: '#667eea',
-                    fillColor: '#667eea',
-                    fillOpacity: 0.2
+        // Fonction pour obtenir la couleur selon l'accélération longitudinale
+        function getColorForAcceleration(accel) {
+            // accel en m/s²
+            if (accel < -2) return '#00FF00'; // Vert - Fort freinage
+            if (accel < -0.5) return '#90EE90'; // Vert clair - Freinage léger
+            if (accel < 0.5) return '#FFFF00'; // Jaune - Vitesse constante
+            if (accel < 2) return '#FFA500'; // Orange - Accélération
+            return '#FF0000'; // Rouge - Forte accélération
+        }
+        
+        // Calculer la distance entre deux points (formule de Haversine)
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371e3; // Rayon de la Terre en mètres
+            const φ1 = lat1 * Math.PI / 180;
+            const φ2 = lat2 * Math.PI / 180;
+            const Δφ = (lat2 - lat1) * Math.PI / 180;
+            const Δλ = (lon2 - lon1) * Math.PI / 180;
+            
+            const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+                     Math.cos(φ1) * Math.cos(φ2) *
+                     Math.sin(Δλ/2) * Math.sin(Δλ/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            
+            return R * c;
+        }
+        
+        // Calculer l'accélération longitudinale
+        function calculateLongitudinalAcceleration(currentSpeed, previousSpeed, deltaTime) {
+            // Convertir km/h en m/s
+            const currentSpeedMs = currentSpeed * 1000 / 3600;
+            const previousSpeedMs = previousSpeed * 1000 / 3600;
+            
+            // Accélération = (v2 - v1) / t
+            const acceleration = (currentSpeedMs - previousSpeedMs) / deltaTime;
+            
+            return acceleration;
+        }
+        
+        // Gestion de la position
+        function handlePosition(position) {
+            const lat = position.coords.latitude;
+            const lon = position.coords.longitude;
+            const speed = position.coords.speed || 0; // en m/s
+            const speedKmh = speed * 3.6; // Conversion en km/h
+            const timestamp = position.timestamp;
+            
+            // Mettre à jour ou créer le marqueur de position actuelle
+            if (!currentMarker) {
+                currentMarker = L.circleMarker([lat, lon], {
+                    radius: 8,
+                    fillColor: '#007AFF',
+                    color: 'white',
+                    weight: 2,
+                    opacity: 1,
+                    fillOpacity: 1
                 }).addTo(map);
+                
+                map.setView([lat, lon], 16);
+            } else {
+                currentMarker.setLatLng([lat, lon]);
             }
             
-            map.setView([lat, lon], 16);
+            // Calculer l'accélération longitudinale
+            let acceleration = 0;
+            if (lastPosition && lastTimestamp) {
+                const deltaTime = (timestamp - lastTimestamp) / 1000; // en secondes
+                
+                if (deltaTime > 0) {
+                    acceleration = calculateLongitudinalAcceleration(speedKmh, lastSpeed, deltaTime);
+                }
+            }
+            
+            // Enregistrer le point si la distance est suffisante
+            if (trackingActive) {
+                let shouldAddPoint = false;
+                
+                if (!lastPosition) {
+                    shouldAddPoint = true;
+                } else {
+                    const distance = calculateDistance(
+                        lastPosition.lat,
+                        lastPosition.lon,
+                        lat,
+                        lon
+                    );
+                    
+                    if (distance >= MIN_DISTANCE) {
+                        shouldAddPoint = true;
+                        totalDistance += distance;
+                    }
+                }
+                
+                if (shouldAddPoint) {
+                    const point = {
+                        lat: lat,
+                        lon: lon,
+                        speed: speedKmh,
+                        acceleration: acceleration,
+                        timestamp: timestamp
+                    };
+                    
+                    pathPoints.push(point);
+                    
+                    // Dessiner le segment si ce n'est pas le premier point
+                    if (pathPoints.length > 1) {
+                        const prevPoint = pathPoints[pathPoints.length - 2];
+                        const color = getColorForAcceleration(acceleration);
+                        
+                        const polyline = L.polyline(
+                            [[prevPoint.lat, prevPoint.lon], [lat, lon]],
+                            {
+                                color: color,
+                                weight: 5,
+                                opacity: 0.8
+                            }
+                        ).addTo(map);
+                        
+                        polylines.push(polyline);
+                    }
+                    
+                    lastPosition = { lat, lon };
+                }
+            }
+            
+            // Mettre à jour les informations
+            document.getElementById('speed').textContent = speedKmh.toFixed(1) + ' km/h';
+            document.getElementById('acceleration').textContent = acceleration.toFixed(2) + ' m/s²';
+            document.getElementById('distance').textContent = totalDistance >= 1000 
+                ? (totalDistance / 1000).toFixed(2) + ' km'
+                : totalDistance.toFixed(0) + ' m';
+            document.getElementById('points').textContent = pathPoints.length;
+            
+            lastSpeed = speedKmh;
+            lastTimestamp = timestamp;
         }
         
-        // Gérer la géolocalisation
+        // Gestion des erreurs GPS
+        function handleError(error) {
+            let message = 'Erreur GPS: ';
+            switch(error.code) {
+                case error.PERMISSION_DENIED:
+                    message += 'Autorisation refusée. Veuillez autoriser l\'accès à la localisation.';
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    message += 'Position non disponible.';
+                    break;
+                case error.TIMEOUT:
+                    message += 'Délai d\'attente dépassé.';
+                    break;
+                default:
+                    message += 'Erreur inconnue.';
+            }
+            showStatus(message);
+        }
+        
+        // Démarrer le suivi
         function startTracking() {
             if (!navigator.geolocation) {
-                showError("La géolocalisation n'est pas supportée");
+                showStatus('La géolocalisation n\'est pas supportée par votre navigateur');
                 return;
             }
             
-            document.getElementById('status').textContent = 'Localisation en cours...';
+            trackingActive = true;
+            document.getElementById('startBtn').style.display = 'none';
+            document.getElementById('stopBtn').style.display = 'block';
+            
+            const options = {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 0
+            };
             
             watchId = navigator.geolocation.watchPosition(
-                (position) => {
-                    const { latitude, longitude, altitude, speed, accuracy } = position.coords;
-                    
-                    updateMap(latitude, longitude, accuracy);
-                    
-                    // Mettre à jour la vitesse (convertir m/s en km/h)
-                    const speedKmh = speed ? (speed * 3.6).toFixed(1) : '0.0';
-                    document.getElementById('speed').textContent = speedKmh;
-                    
-                    // Mettre à jour l'altitude
-                    const alt = altitude ? altitude.toFixed(0) : '0';
-                    document.getElementById('altitude').textContent = alt;
-                    
-                    document.getElementById('status').textContent = 'GPS actif';
-                    hideError();
-                },
-                (error) => {
-                    let message = '';
-                    switch(error.code) {
-                        case error.PERMISSION_DENIED:
-                            message = "Accès GPS refusé. Autorisez l'accès dans les paramètres.";
-                            break;
-                        case error.POSITION_UNAVAILABLE:
-                            message = "Position indisponible";
-                            break;
-                        case error.TIMEOUT:
-                            message = "Délai d'attente dépassé";
-                            break;
-                    }
-                    showError(message);
-                },
-                {
-                    enableHighAccuracy: true,
-                    maximumAge: 0,
-                    timeout: 5000
-                }
+                handlePosition,
+                handleError,
+                options
             );
-        }
-        
-        // Gérer l'accéléromètre
-        function startAccelerometer() {
-            if (typeof DeviceMotionEvent !== 'undefined') {
-                // Sur iOS 13+, demander la permission
-                if (typeof DeviceMotionEvent.requestPermission === 'function') {
-                    DeviceMotionEvent.requestPermission()
-                        .then(response => {
-                            if (response === 'granted') {
-                                listenToAccelerometer();
-                            } else {
-                                showError("Accès accéléromètre refusé");
-                            }
-                        })
-                        .catch(console.error);
-                } else {
-                    listenToAccelerometer();
-                }
-            } else {
-                showError("Accéléromètre non supporté");
-            }
-        }
-        
-        function listenToAccelerometer() {
-            window.addEventListener('devicemotion', (event) => {
-                if (event.accelerationIncludingGravity) {
-                    const x = event.accelerationIncludingGravity.x || 0;
-                    const y = event.accelerationIncludingGravity.y || 0;
-                    const z = event.accelerationIncludingGravity.z || 0;
-                    
-                    document.getElementById('accelX').textContent = x.toFixed(1);
-                    document.getElementById('accelY').textContent = y.toFixed(1);
-                    document.getElementById('accelZ').textContent = z.toFixed(1);
-                }
-            });
-        }
-        
-        function showError(message) {
-            const errorDiv = document.getElementById('error');
-            errorDiv.textContent = message;
-            errorDiv.style.display = 'block';
-        }
-        
-        function hideError() {
-            document.getElementById('error').style.display = 'none';
-        }
-        
-        function toggleTracking() {
-            const btn = document.getElementById('startBtn');
             
-            if (!isTracking) {
-                startTracking();
-                startAccelerometer();
-                btn.textContent = 'Arrêter';
-                btn.style.background = '#ff4444';
-                isTracking = true;
-            } else {
-                if (watchId) {
-                    navigator.geolocation.clearWatch(watchId);
-                }
-                btn.textContent = 'Démarrer';
-                btn.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
-                document.getElementById('status').textContent = 'Arrêté';
-                isTracking = false;
+            showStatus('Suivi GPS activé', 2000);
+        }
+        
+        // Arrêter le suivi
+        function stopTracking() {
+            if (watchId) {
+                navigator.geolocation.clearWatch(watchId);
+                watchId = null;
+            }
+            
+            trackingActive = false;
+            document.getElementById('startBtn').style.display = 'block';
+            document.getElementById('stopBtn').style.display = 'none';
+            
+            showStatus('Suivi GPS arrêté', 2000);
+        }
+        
+        // Effacer la trajectoire
+        function clearTrack() {
+            // Supprimer toutes les polylignes
+            polylines.forEach(polyline => map.removeLayer(polyline));
+            polylines = [];
+            
+            // Réinitialiser les données
+            pathPoints = [];
+            lastPosition = null;
+            lastSpeed = 0;
+            lastTimestamp = null;
+            totalDistance = 0;
+            
+            // Réinitialiser l'affichage
+            document.getElementById('distance').textContent = '0 m';
+            document.getElementById('points').textContent = '0';
+            document.getElementById('acceleration').textContent = '0.0 m/s²';
+            
+            showStatus('Trajectoire effacée', 2000);
+        }
+        
+        // Afficher un message de statut
+        function showStatus(message, duration = 0) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.classList.add('show');
+            
+            if (duration > 0) {
+                setTimeout(() => {
+                    statusDiv.classList.remove('show');
+                }, duration);
             }
         }
         
-        // Initialisation
-        initMap();
-        document.getElementById('startBtn').addEventListener('click', toggleTracking);
+        // Événements des boutons
+        document.getElementById('startBtn').addEventListener('click', startTracking);
+        document.getElementById('stopBtn').addEventListener('click', stopTracking);
+        document.getElementById('clearBtn').addEventListener('click', clearTrack);
+        
+        // Initialisation au chargement
+        window.addEventListener('load', () => {
+            initMap();
+            setTimeout(() => {
+                document.getElementById('status').classList.remove('show');
+            }, 3000);
+        });
     </script>
 </body>
 </html>
