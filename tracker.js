@@ -5,8 +5,8 @@ const BATCH_SIZE = 10; // Nombre de points avant sauvegarde batch
 const SUPABASE_URL = 'https://iclxtruemccjsnfcivfs.supabase.co'; // À remplacer
 const SUPABASE_KEY = 'sb_publishable_UZPiiNjtGb-v0XvseJ1rKw_8HqRPhu3'; // À remplacer
 
-const SEUIL_BAS = -2;
-const SEUIL_HAUT = 2;
+//const SEUIL_BAS = -2;
+const SEUIL = 2;
 
 // ==================== MODE TEST GPS ====================
 const MOCK_GPS = false; // Passer à false pour utilisation réelle
@@ -84,25 +84,29 @@ let audioContext = null;
 let lastBeepTime = 0;
 const BEEP_COOLDOWN = 2000; // ms entre deux bips
 
+const audio = new Audio('beep.mp3');
+
 // Émettre un bip via Web Audio API
 function playBeep(frequency = 880, duration = 0.2) {
-    if (!audioContext) return;
-    const now = Date.now();
-    if (now - lastBeepTime < BEEP_COOLDOWN) return;
-    lastBeepTime = now;
 
-    const oscillator = audioContext.createOscillator();
-    const gainNode = audioContext.createGain();
-    oscillator.connect(gainNode);
-    gainNode.connect(audioContext.destination);
+    audio.play();
+    // if (!audioContext) return;
+    // const now = Date.now();
+    // if (now - lastBeepTime < BEEP_COOLDOWN) return;
+    // lastBeepTime = now;
 
-    oscillator.type = 'sine';
-    oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
-    gainNode.gain.setValueAtTime(0.5, audioContext.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + duration);
+    // const oscillator = audioContext.createOscillator();
+    // const gainNode = audioContext.createGain();
+    // oscillator.connect(gainNode);
+    // gainNode.connect(audioContext.destination);
 
-    oscillator.start(audioContext.currentTime);
-    oscillator.stop(audioContext.currentTime + duration);
+    // oscillator.type = 'sine';
+    // oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
+    // gainNode.gain.setValueAtTime(0.5, audioContext.currentTime);
+    // gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + duration);
+
+    // oscillator.start(audioContext.currentTime);
+    // oscillator.stop(audioContext.currentTime + duration);
 }
 
 // Initialisation de la carte
@@ -132,8 +136,8 @@ function initMap() {
 // Fonction pour obtenir la couleur selon l'accélération longitudinale
 function getColorForAcceleration(accel) {
     // accel en m/s²
-    if (accel < SEUIL_BAS) return '#ff0000'; // Vert - Fort freinage
-    if (accel > SEUIL_HAUT) return '#ff0000'; // Orange - Accélération
+    if (accel < -SEUIL) return '#ff0000'; // Vert - Fort freinage
+    if (accel > SEUIL) return '#ff0000'; // Orange - Accélération
 
     // if (accel < SEUIL_BAS) return '#ff0000'; // Vert - Fort freinage
     // if (accel < -0.5) return '#90EE90'; // Vert clair - Freinage léger
@@ -481,9 +485,9 @@ function handlePosition(position) {
 
     // Bip sur dépassement des seuils (±2 m/s²)
     if (trackingActive) {
-        if (displayAccel >= 2) {
+        if (displayAccel >= SEUIL) {
             playBeep(880, 0.25); // Aigu : forte accélération
-        } else if (displayAccel <= -2) {
+        } else if (displayAccel <= -SEUIL) {
             playBeep(220, 0.25); // Grave : fort freinage
         }
     }
