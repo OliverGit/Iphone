@@ -5,6 +5,9 @@ const BATCH_SIZE = 10; // Nombre de points avant sauvegarde batch
 const SUPABASE_URL = 'https://iclxtruemccjsnfcivfs.supabase.co'; // À remplacer
 const SUPABASE_KEY = 'sb_publishable_UZPiiNjtGb-v0XvseJ1rKw_8HqRPhu3'; // À remplacer
 
+const SEUIL_BAS = -2;
+const SEUIL_HAUT = 2;
+
 // Variables globales
 let map;
 let currentMarker;
@@ -66,17 +69,20 @@ function initMap() {
         }
     });
 
-    showStatus('Appuyez sur Démarrer pour commencer le suivi');
+    //showStatus('Appuyez sur Démarrer pour commencer le suivi');
 }
 
 // Fonction pour obtenir la couleur selon l'accélération longitudinale
 function getColorForAcceleration(accel) {
     // accel en m/s²
-    if (accel < -2) return '#ff0000'; // Vert - Fort freinage
-    if (accel < -0.5) return '#90EE90'; // Vert clair - Freinage léger
-    if (accel < 0.5) return '#90EE90'; // Jaune - Vitesse constante
-    if (accel < 2) return '#90EE90'; // Orange - Accélération
-    return '#FF0000'; // Rouge - Forte accélération
+    if (accel < SEUIL_BAS) return '#ff0000'; // Vert - Fort freinage
+    if (accel > SEUIL_HAUT) return '#ff0000'; // Orange - Accélération
+
+    // if (accel < SEUIL_BAS) return '#ff0000'; // Vert - Fort freinage
+    // if (accel < -0.5) return '#90EE90'; // Vert clair - Freinage léger
+    // if (accel < 0.5) return '#90EE90'; // Jaune - Vitesse constante
+
+    return '#90EE90'; 
 }
 
 // ==================== SUPABASE INTEGRATION ====================
@@ -402,7 +408,11 @@ function handlePosition(position) {
             polylines.push(polyline);
         }
 
-        lastPosition = { lat, lon };
+    }
+
+    // Toujours mettre à jour la position de référence pour le prochain calcul
+    lastPosition = { lat, lon };
+    if (velocityVector) {
         lastVelocityVector = velocityVector;
     }
 
