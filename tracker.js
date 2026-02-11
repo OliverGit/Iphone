@@ -1,12 +1,69 @@
 // Configuration
 const UPDATE_INTERVAL = 1000; // Mise à jour toutes les secondes
-const MIN_DISTANCE = 5; // Distance minimale en mètres pour enregistrer un point
+const MIN_DISTANCE = 2; // Distance minimale en mètres pour enregistrer un point
 const BATCH_SIZE = 10; // Nombre de points avant sauvegarde batch
 const SUPABASE_URL = 'https://iclxtruemccjsnfcivfs.supabase.co'; // À remplacer
 const SUPABASE_KEY = 'sb_publishable_UZPiiNjtGb-v0XvseJ1rKw_8HqRPhu3'; // À remplacer
 
 const SEUIL_BAS = -2;
 const SEUIL_HAUT = 2;
+
+// ==================== MODE TEST GPS ====================
+const MOCK_GPS = false; // Passer à false pour utilisation réelle
+
+// Route simulée : [lat, lon] à intervalles de 1 seconde
+// Accélération forte t=4-5 (+3 m/s²) → bip, freinage fort t=10-11 (-5 m/s²) → bip
+const MOCK_ROUTE = [
+    [48.856600, 2.352200], // t=0  arrêt (référence)
+    [48.856645, 2.352200], // t=1   5 m/s  = 18 km/h
+    [48.856708, 2.352200], // t=2   7 m/s  +2 m/s²
+    [48.856789, 2.352200], // t=3   9 m/s  +2 m/s²
+    [48.856897, 2.352200], // t=4  12 m/s  +3 m/s² → bip accélération
+    [48.857032, 2.352200], // t=5  15 m/s  +3 m/s² → bip accélération
+    [48.857167, 2.352200], // t=6  15 m/s  constant
+    [48.857302, 2.352200], // t=7  15 m/s  constant
+    [48.857437, 2.352200], // t=8  15 m/s  constant
+    [48.857572, 2.352200], // t=9  15 m/s  constant
+    [48.857662, 2.352200], // t=10 10 m/s  -5 m/s² → bip freinage
+    [48.857707, 2.352200], // t=11  5 m/s  -5 m/s² → bip freinage
+    [48.857725, 2.352200], // t=12  2 m/s  décélération
+    [48.857725, 2.352200], // t=13  0 m/s  arrêt
+];
+
+const mockGeolocation = {
+    _startTime: 0,
+    _makePosition(lat, lon, timestamp) {
+        return {
+            coords: {
+                latitude: lat, longitude: lon, altitude: 100, accuracy: 5,
+                altitudeAccuracy: null, heading: null, speed: null
+            },
+            timestamp
+        };
+    },
+    getCurrentPosition(success) {
+        this._startTime = Date.now();
+        const [lat, lon] = MOCK_ROUTE[0];
+        setTimeout(() => success(this._makePosition(lat, lon, this._startTime)), 300);
+    },
+    watchPosition(success) {
+        let i = 1;
+        const id = setInterval(() => {
+            if (i < MOCK_ROUTE.length) {
+                const [lat, lon] = MOCK_ROUTE[i];
+                success(mockGeolocation._makePosition(lat, lon, mockGeolocation._startTime + i * 1000));
+                i++;
+            } else {
+                clearInterval(id);
+            }
+        }, 1000);
+        return id;
+    },
+    clearWatch(id) { clearInterval(id); }
+};
+
+const _geo = MOCK_GPS ? mockGeolocation : navigator.geolocation;
+// =========================================================
 
 // Variables globales
 let map;
@@ -357,6 +414,8 @@ function handlePosition(position) {
         }
     }
 
+    console.log('[GPS] deltaTime:', lastTimestamp ? ((timestamp - lastTimestamp)/1000).toFixed(2)+'s' : 'N/A', '| distance:', distance.toFixed(2)+'m', '| seuil:', MIN_DISTANCE+'m');
+
     // Enregistrer le point si la distance est suffisante
     if (trackingActive && distance >= MIN_DISTANCE) {
         totalDistance += distance;
@@ -465,13 +524,13 @@ function handleError(error) {
 
 // Démarrer le suivi
 async function startTracking() {
-    if (!navigator.geolocation) {
+    if (!_geo) {
         showStatus('La géolocalisation n\'est pas supportée par votre navigateur', 0);
         return;
     }
 
     // Vérifier les permissions d'abord (API Permissions si disponible)
-    if (navigator.permissions) {
+    if (!MOCK_GPS && navigator.permissions) {
         try {
             const result = await navigator.permissions.query({ name: 'geolocation' });
 
@@ -509,13 +568,13 @@ async function startTracking() {
     };
 
     // Première position pour déclencher la demande d'autorisation
-    navigator.geolocation.getCurrentPosition(
+    _geo.getCurrentPosition(
         (position) => {
-            showStatus('GPS activé !', 2000);
+            showStatus(MOCK_GPS ? '[TEST] Simulation démarrée' : 'GPS activé !', 2000);
             handlePosition(position);
 
             // Puis démarrer le suivi continu
-            watchId = navigator.geolocation.watchPosition(
+            watchId = _geo.watchPosition(
                 handlePosition,
                 handleError,
                 options
@@ -529,7 +588,7 @@ async function startTracking() {
 // Arrêter le suivi
 async function stopTracking() {
     if (watchId) {
-        navigator.geolocation.clearWatch(watchId);
+        _geo.clearWatch(watchId);
         watchId = null;
     }
 
@@ -561,6 +620,7 @@ function clearTrack() {
     lastPosition = null;
     lastSpeed = 0;
     lastTimestamp = null;
+    lastVelocityVector = null;
     totalDistance = 0;
 
     // Réinitialiser l'affichage
