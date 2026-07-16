@@ -1,0 +1,2099 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0a0f1e">
+<title>DriveCoach v3</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  :root {
+    --bg: #0a0f1e;
+    --surface: #111827;
+    --surface2: #1a2236;
+    --border: rgba(255,255,255,0.08);
+    --text: #f0f4ff;
+    --text2: #8899bb;
+    --accent: #3b82f6;
+    --green: #22c55e;
+    --orange: #f97316;
+    --red: #ef4444;
+    --yellow: #eab308;
+    --radius: 16px;
+    --font: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  #app { display: flex; flex-direction: column; min-height: 100vh; }
+
+  header {
+    padding: 56px 20px 16px;
+    background: linear-gradient(180deg, rgba(10,15,30,1) 0%, rgba(10,15,30,0) 100%);
+    position: sticky; top: 0; z-index: 100;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+
+  .logo { font-size: 20px; font-weight: 700; letter-spacing: -0.5px; }
+  .logo span { color: var(--accent); }
+
+  .status-pill {
+    display: flex; align-items: center; gap: 6px;
+    padding: 6px 12px; border-radius: 20px;
+    background: var(--surface2); border: 1px solid var(--border);
+    font-size: 12px; font-weight: 500;
+  }
+  .status-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--text2); transition: background 0.3s;
+  }
+  .status-dot.active { background: var(--green); box-shadow: 0 0 6px var(--green); animation: pulse 2s infinite; }
+  .status-dot.warning { background: var(--orange); }
+  .status-dot.error { background: var(--red); }
+  @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+
+  main { flex: 1; padding: 0 16px 100px; display: flex; flex-direction: column; gap: 16px; }
+
+  .tabs {
+    display: flex; gap: 4px;
+    background: var(--surface); border-radius: 12px; padding: 4px;
+    margin: 8px 16px 0;
+  }
+  .tab {
+    flex: 1; padding: 8px 4px; text-align: center;
+    font-size: 13px; font-weight: 500; color: var(--text2);
+    border-radius: 8px; border: none; background: transparent;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .tab.active { background: var(--surface2); color: var(--text); }
+
+  .panel { display: none; flex-direction: column; gap: 16px; }
+  .panel.active { display: flex; }
+
+  .score-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    display: flex; align-items: center; gap: 20px;
+  }
+
+  .ring-wrap { position: relative; width: 100px; height: 100px; flex-shrink: 0; }
+  .ring-wrap svg { transform: rotate(-90deg); }
+  .ring-bg { stroke: var(--surface2); }
+  .ring-fill { stroke: var(--green); stroke-linecap: round; transition: stroke-dashoffset 1s ease, stroke 0.5s; }
+  .ring-label {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+  }
+  .ring-value { font-size: 28px; font-weight: 700; }
+  .ring-unit { font-size: 11px; color: var(--text2); }
+
+  .score-meta { flex: 1; }
+  .score-grade { font-size: 36px; font-weight: 800; line-height: 1; margin-bottom: 4px; }
+  .score-label { font-size: 14px; color: var(--text2); }
+  .score-trend { font-size: 12px; margin-top: 8px; }
+
+  .metrics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .metric-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px;
+  }
+  .metric-label { font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+  .metric-value { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .metric-unit { font-size: 12px; color: var(--text2); font-weight: 400; }
+  .metric-bar { height: 3px; background: var(--surface2); border-radius: 2px; margin-top: 8px; overflow: hidden; }
+  .metric-bar-fill { height: 100%; border-radius: 2px; transition: width 0.3s, background 0.3s; }
+
+  .accel-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+  }
+  .accel-title { font-size: 12px; color: var(--text2); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+  .accel-gauge { position: relative; height: 60px; }
+  .accel-track {
+    height: 8px;
+    background: var(--surface2);
+    border-radius: 4px;
+    margin: 26px 0 0;
+    position: relative;
+    overflow: hidden;
+  }
+  .accel-zones { position: absolute; inset: 0; display: flex; }
+  .zone-red-l { flex: 0 0 15%; background: rgba(239,68,68,0.3); }
+  .zone-orange-l { flex: 0 0 15%; background: rgba(249,115,22,0.2); }
+  .zone-green { flex: 1; background: rgba(34,197,94,0.15); }
+  .zone-orange-r { flex: 0 0 15%; background: rgba(249,115,22,0.2); }
+  .zone-red-r { flex: 0 0 15%; background: rgba(239,68,68,0.3); }
+
+  .accel-needle {
+    position: absolute;
+    top: -18px;
+    width: 2px; height: 28px;
+    background: var(--text);
+    border-radius: 1px;
+    transform: translateX(-50%);
+    transition: left 0.1s ease, background 0.2s;
+    left: 50%;
+  }
+  .accel-needle::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%; transform: translateX(-50%);
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: inherit;
+  }
+  .accel-labels {
+    display: flex; justify-content: space-between;
+    font-size: 10px; color: var(--text2); margin-top: 6px;
+  }
+
+  .accel-value {
+    text-align: center; margin-top: 8px;
+    font-size: 18px; font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .events-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .events-header {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px; font-weight: 600;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .events-list { max-height: 200px; overflow-y: auto; }
+  .event-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+    animation: fadeIn 0.3s ease;
+  }
+  @keyframes fadeIn { from { opacity:0; transform: translateX(8px); } to { opacity:1; transform: translateX(0); } }
+  .event-item:last-child { border-bottom: none; }
+  .event-icon {
+    width: 28px; height: 28px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; flex-shrink: 0;
+  }
+  .event-icon.accel { background: rgba(239,68,68,0.15); }
+  .event-icon.brake { background: rgba(249,115,22,0.15); }
+  .event-icon.ok { background: rgba(34,197,94,0.15); }
+  .event-text { flex: 1; }
+  .event-title { font-weight: 500; }
+  .event-sub { font-size: 11px; color: var(--text2); margin-top: 1px; }
+  .event-time { font-size: 11px; color: var(--text2); }
+
+  .btn {
+    border: none; cursor: pointer;
+    border-radius: 14px;
+    font-family: var(--font); font-weight: 600;
+    transition: transform 0.1s, opacity 0.2s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .btn:active { transform: scale(0.97); }
+
+  .btn-primary {
+    background: var(--accent);
+    color: white; font-size: 16px;
+    padding: 16px; width: 100%;
+  }
+  .btn-danger { background: var(--red); color: white; font-size: 16px; padding: 16px; width: 100%; }
+  .btn-secondary {
+    background: var(--surface2);
+    color: var(--text); font-size: 14px;
+    padding: 12px 16px;
+    border: 1px solid var(--border);
+  }
+  .btn-small { padding: 6px 12px; font-size: 12px; border-radius: 8px; }
+  .btn-row { display: flex; gap: 10px; }
+  .btn-row .btn { flex: 1; }
+
+  .section-label {
+    font-size: 12px; color: var(--text2);
+    text-transform: uppercase; letter-spacing: 0.8px;
+    font-weight: 600; padding: 0 2px;
+  }
+
+  .alert-banner {
+    border-radius: var(--radius); padding: 14px 16px;
+    display: flex; align-items: center; gap: 12px;
+    font-size: 14px; font-weight: 500;
+    animation: slideDown 0.3s ease;
+  }
+  @keyframes slideDown { from { opacity:0; transform: translateY(-8px); } to { opacity:1; transform: translateY(0); } }
+  .alert-banner.danger { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); color: #fca5a5; }
+  .alert-banner.warning { background: rgba(249,115,22,0.1); border: 1px solid rgba(249,115,22,0.3); color: #fdba74; }
+  .alert-banner.info { background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.3); color: #93c5fd; }
+  .alert-icon { font-size: 20px; }
+
+  #permission-screen {
+    position: fixed; inset: 0; z-index: 1000;
+    background: var(--bg);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 40px 24px; text-align: center;
+  }
+  .perm-icon { font-size: 64px; margin-bottom: 24px; }
+  .perm-title { font-size: 26px; font-weight: 700; margin-bottom: 12px; }
+  .perm-desc { font-size: 15px; color: var(--text2); line-height: 1.6; margin-bottom: 32px; }
+  .perm-list {
+    text-align: left; margin-bottom: 32px;
+    background: var(--surface); border-radius: var(--radius);
+    padding: 16px; width: 100%; border: 1px solid var(--border);
+  }
+  .perm-item { display: flex; align-items: center; gap: 10px; padding: 8px 0; font-size: 14px; }
+  .perm-item:not(:last-child) { border-bottom: 1px solid var(--border); }
+  .perm-error {
+    color: #fca5a5; font-size: 13px; margin-top: 16px;
+    background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3);
+    border-radius: 10px; padding: 10px 14px; display: none;
+  }
+
+  #calibration-screen {
+    position: fixed; inset: 0; z-index: 999;
+    background: var(--bg);
+    display: none; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 40px 24px; text-align: center;
+  }
+  .cal-icon { font-size: 56px; margin-bottom: 20px; }
+  .cal-title { font-size: 22px; font-weight: 700; margin-bottom: 8px; }
+  .cal-desc { font-size: 14px; color: var(--text2); line-height: 1.6; margin-bottom: 24px; }
+  .cal-progress {
+    width: 100%; height: 6px; background: var(--surface2);
+    border-radius: 3px; margin-bottom: 20px; overflow: hidden;
+  }
+  .cal-progress-fill { height: 100%; background: var(--accent); border-radius: 3px; transition: width 0.1s; width: 0%; }
+  .cal-values {
+    background: var(--surface); border-radius: var(--radius);
+    padding: 16px; width: 100%; margin-bottom: 24px;
+    border: 1px solid var(--border);
+  }
+  .cal-row { display: flex; justify-content: space-between; font-size: 13px; padding: 4px 0; }
+  .cal-key { color: var(--text2); }
+  .cal-val { font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  .ref-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px;
+  }
+  .ref-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .ref-title { font-size: 14px; font-weight: 600; }
+  .ref-badge {
+    font-size: 11px; padding: 3px 8px; border-radius: 6px;
+    background: rgba(59,130,246,0.15); color: #93c5fd;
+  }
+  .ref-stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  .ref-stat { text-align: center; }
+  .ref-stat-val { font-size: 18px; font-weight: 700; }
+  .ref-stat-lbl { font-size: 10px; color: var(--text2); margin-top: 2px; }
+
+  .trip-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 16px; border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .trip-row:last-child { border-bottom: none; }
+  .trip-info { flex: 1; min-width: 0; }
+  .trip-date { font-weight: 500; }
+  .trip-sub { font-size: 11px; color: var(--text2); margin-top: 1px; }
+  .trip-actions { display: flex; gap: 6px; flex-shrink: 0; }
+
+  .settings-group {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); overflow: hidden;
+  }
+  .settings-item {
+    display: flex; align-items: center;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    gap: 12px;
+  }
+  .settings-item:last-child { border-bottom: none; }
+  .settings-icon { font-size: 20px; width: 28px; text-align: center; flex-shrink: 0; }
+  .settings-text { flex: 1; }
+  .settings-label { font-size: 14px; font-weight: 500; }
+  .settings-sub { font-size: 12px; color: var(--text2); margin-top: 1px; }
+  .settings-control { flex-shrink: 0; }
+
+  .toggle {
+    width: 44px; height: 26px;
+    background: var(--surface2); border-radius: 13px;
+    position: relative; cursor: pointer;
+    border: 1px solid var(--border);
+    transition: background 0.2s;
+  }
+  .toggle.on { background: var(--accent); border-color: var(--accent); }
+  .toggle::after {
+    content: '';
+    position: absolute;
+    top: 2px; left: 2px;
+    width: 20px; height: 20px;
+    border-radius: 50%; background: white;
+    transition: transform 0.2s;
+  }
+  .toggle.on::after { transform: translateX(18px); }
+
+  input[type=range] {
+    -webkit-appearance: none;
+    width: 120px; height: 4px;
+    background: var(--surface2); border-radius: 2px; outline: none;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px; height: 18px;
+    border-radius: 50%; background: var(--accent); cursor: pointer;
+  }
+
+  .chart-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px;
+  }
+  .chart-title { font-size: 12px; color: var(--text2); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+  canvas.trip-chart { width: 100%; height: 120px; }
+
+  .empty-state {
+    text-align: center; padding: 40px 20px;
+    color: var(--text2);
+  }
+  .empty-icon { font-size: 40px; margin-bottom: 12px; }
+  .empty-text { font-size: 14px; }
+
+  .map-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); overflow: hidden;
+  }
+  .map-card .chart-title { padding: 12px 16px 0; }
+  #gps-map { height: 240px; margin-top: 8px; }
+  .map-card .leaflet-container { background: #111827; }
+  .map-score-legend {
+    display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+    padding: 8px 16px 12px; font-size: 11px; color: var(--text2);
+  }
+  .legend-item { display: flex; align-items: center; gap: 4px; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+  ::-webkit-scrollbar { width: 0; }
+</style>
+</head>
+<body>
+
+<!-- Permission screen -->
+<div id="permission-screen">
+  <div class="perm-icon">🚗</div>
+  <h1 class="perm-title">DriveCoach <span style="color:var(--accent)">v3</span></h1>
+  <p class="perm-desc">Analyse ton comportement de conduite en temps réel grâce aux capteurs de ton iPhone.</p>
+  <div class="perm-list">
+    <div class="perm-item"><span>📍</span><span>Géolocalisation GPS (1 Hz)</span></div>
+    <div class="perm-item"><span>📱</span><span>Accéléromètre / Gyroscope (60 Hz)</span></div>
+    <div class="perm-item"><span>🔒</span><span>100% local — aucune donnée envoyée</span></div>
+  </div>
+  <button class="btn btn-primary" id="perm-btn" onclick="requestPermissions()">Autoriser les capteurs</button>
+  <div class="perm-error" id="perm-error"></div>
+  <p style="font-size:12px;color:var(--text2);margin-top:16px;">Safari iOS 13+ requis · iPhone uniquement</p>
+</div>
+
+<!-- Calibration screen -->
+<div id="calibration-screen">
+  <div class="cal-icon">🎯</div>
+  <h2 class="cal-title">Calibration de l'axe</h2>
+  <p class="cal-desc">Pose ton iPhone sur le support de voiture et reste immobile 5 secondes.
+    L'axe avant/arrière sera ensuite affiné automatiquement en roulant, grâce au GPS.</p>
+  <div class="cal-progress"><div class="cal-progress-fill" id="cal-bar"></div></div>
+  <div class="cal-values">
+    <div class="cal-row"><span class="cal-key">Acc X moyen</span><span class="cal-val" id="cal-x">—</span></div>
+    <div class="cal-row"><span class="cal-key">Acc Y moyen</span><span class="cal-val" id="cal-y">—</span></div>
+    <div class="cal-row"><span class="cal-key">Acc Z moyen</span><span class="cal-val" id="cal-z">—</span></div>
+    <div class="cal-row"><span class="cal-key">Stabilité</span><span class="cal-val" id="cal-stab">—</span></div>
+  </div>
+  <button class="btn btn-primary" id="cal-btn" onclick="startCalibration()">Démarrer la calibration</button>
+</div>
+
+<!-- Main app -->
+<div id="app">
+  <header>
+    <div class="logo">Drive<span>Coach</span></div>
+    <div class="status-pill">
+      <div class="status-dot" id="status-dot"></div>
+      <span id="status-text">Arrêté</span>
+    </div>
+  </header>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('live')">Live</button>
+    <button class="tab" onclick="switchTab('trip')">Trajet</button>
+    <button class="tab" onclick="switchTab('ref')">Historique</button>
+    <button class="tab" onclick="switchTab('settings')">Réglages</button>
+  </div>
+
+  <main>
+    <div id="panel-live" class="panel active">
+      <div id="alert-zone"></div>
+
+      <!-- Score -->
+      <div class="score-card">
+        <div class="ring-wrap">
+          <svg width="100" height="100" viewBox="0 0 100 100">
+            <circle class="ring-bg" cx="50" cy="50" r="40" fill="none" stroke-width="8"/>
+            <circle class="ring-fill" id="score-ring" cx="50" cy="50" r="40" fill="none" stroke-width="8"
+              stroke-dasharray="251.3" stroke-dashoffset="0"/>
+          </svg>
+          <div class="ring-label">
+            <span class="ring-value" id="score-val">100</span>
+            <span class="ring-unit">score</span>
+          </div>
+        </div>
+        <div class="score-meta">
+          <div class="score-grade" id="score-grade">A</div>
+          <div class="score-label" id="score-label">Conduite douce</div>
+          <div class="score-trend" id="score-trend" style="color:var(--green)">Le score remonte en conduisant proprement</div>
+        </div>
+      </div>
+
+      <!-- GPS Map : couleur = qualité LOCALE du segment (pas le score cumulé) -->
+      <div class="map-card">
+        <div class="chart-title">Trace GPS · couleur = douceur du segment</div>
+        <div id="gps-map"></div>
+        <div class="map-score-legend">
+          <div class="legend-item"><div class="legend-dot" style="background:#22c55e"></div>Doux</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#86efac"></div>Correct</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#eab308"></div>Limite</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#f97316"></div>Brusque</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#ef4444"></div>Très brusque</div>
+        </div>
+      </div>
+
+      <!-- Live metrics -->
+      <div class="section-label">Métriques en temps réel</div>
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <div class="metric-label">Vitesse fusionnée</div>
+          <div class="metric-value"><span id="speed-val">0</span><span class="metric-unit"> km/h</span></div>
+          <div class="metric-bar"><div class="metric-bar-fill" id="speed-bar" style="width:0%;background:var(--green)"></div></div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Accél. long.</div>
+          <div class="metric-value"><span id="accel-val">0.0</span><span class="metric-unit"> m/s²</span></div>
+          <div class="metric-bar"><div class="metric-bar-fill" id="accel-bar" style="width:50%;background:var(--green)"></div></div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Précision GPS</div>
+          <div class="metric-value"><span id="gps-acc">—</span><span class="metric-unit"> m</span></div>
+          <div class="metric-bar"><div class="metric-bar-fill" id="gps-bar" style="width:0%;background:var(--accent)"></div></div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">État capteurs</div>
+          <div class="metric-value" style="font-size:15px;line-height:1.3;padding-top:4px;" id="sensor-state">—</div>
+        </div>
+      </div>
+
+      <!-- Accel gauge -->
+      <div class="accel-card">
+        <div class="accel-title">Accélération longitudinale — seuil <span id="gauge-thresh">±0.30</span> m/s²</div>
+        <div class="accel-gauge">
+          <div class="accel-track">
+            <div class="accel-zones">
+              <div class="zone-red-l"></div>
+              <div class="zone-orange-l"></div>
+              <div class="zone-green"></div>
+              <div class="zone-orange-r"></div>
+              <div class="zone-red-r"></div>
+            </div>
+            <div class="accel-needle" id="accel-needle"></div>
+          </div>
+        </div>
+        <div class="accel-labels">
+          <span>-1.5 m/s²</span><span>Freinage fort</span><span>0</span><span>Accél. forte</span><span>+1.5 m/s²</span>
+        </div>
+        <div class="accel-value"><span id="accel-gauge-val">0.00</span> m/s²</div>
+      </div>
+
+      <!-- Events -->
+      <div class="events-card">
+        <div class="events-header">
+          <span>Événements</span>
+          <button class="btn btn-secondary btn-small" onclick="clearEvents()">Effacer</button>
+        </div>
+        <div class="events-list" id="events-list">
+          <div class="empty-state">
+            <div class="empty-icon">📋</div>
+            <div class="empty-text">Les événements de conduite apparaîtront ici</div>
+          </div>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" id="main-btn" onclick="toggleSession()">▶ Démarrer la session</button>
+    </div>
+
+    <!-- Trip panel -->
+    <div id="panel-trip" class="panel">
+      <div class="chart-card">
+        <div class="chart-title">Accélération longitudinale (session)</div>
+        <canvas id="accel-chart" class="trip-chart"></canvas>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Vitesse fusionnée (session)</div>
+        <canvas id="speed-chart" class="trip-chart"></canvas>
+      </div>
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <div class="metric-label">Événements accél.</div>
+          <div class="metric-value"><span id="trip-accel-events">0</span></div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Événements freinage</div>
+          <div class="metric-value"><span id="trip-brake-events">0</span></div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Vitesse max</div>
+          <div class="metric-value"><span id="trip-max-speed">0</span><span class="metric-unit"> km/h</span></div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Distance</div>
+          <div class="metric-value"><span id="trip-distance">0.0</span><span class="metric-unit"> km</span></div>
+        </div>
+      </div>
+      <button class="btn btn-secondary" onclick="saveAsReference()" id="save-ref-btn" style="width:100%;display:none;">
+        💾 Sauvegarder comme trajet de référence
+      </button>
+    </div>
+
+    <!-- History / Reference panel -->
+    <div id="panel-ref" class="panel">
+      <div class="section-label">Trajet de référence</div>
+      <div id="ref-content">
+        <div class="empty-state">
+          <div class="empty-icon">🗺</div>
+          <div class="empty-text">Aucun trajet de référence.<br>Complète un trajet et sauvegarde-le.</div>
+        </div>
+      </div>
+      <div class="section-label">Trajets récents</div>
+      <div class="events-card" id="trips-list">
+        <div class="empty-state">
+          <div class="empty-icon">🕓</div>
+          <div class="empty-text">Les trajets terminés apparaîtront ici</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings panel -->
+    <div id="panel-settings" class="panel">
+      <div class="section-label">Détection</div>
+      <div class="settings-group">
+        <div class="settings-item">
+          <span class="settings-icon">⚡</span>
+          <div class="settings-text">
+            <div class="settings-label">Seuil accélération</div>
+            <div class="settings-sub" id="thresh-accel-label">0.30 m/s² (min 0.15)</div>
+          </div>
+          <div class="settings-control">
+            <input type="range" min="15" max="80" value="30" id="thresh-accel"
+              oninput="updateThreshold('accel', this.value)">
+          </div>
+        </div>
+        <div class="settings-item">
+          <span class="settings-icon">🛑</span>
+          <div class="settings-text">
+            <div class="settings-label">Seuil freinage</div>
+            <div class="settings-sub" id="thresh-brake-label">0.30 m/s² (min 0.15)</div>
+          </div>
+          <div class="settings-control">
+            <input type="range" min="15" max="80" value="30" id="thresh-brake"
+              oninput="updateThreshold('brake', this.value)">
+          </div>
+        </div>
+        <div class="settings-item">
+          <span class="settings-icon">🔇</span>
+          <div class="settings-text">
+            <div class="settings-label">Fenêtre de silence</div>
+            <div class="settings-sub" id="silence-label">2.0 s entre événements</div>
+          </div>
+          <div class="settings-control">
+            <input type="range" min="10" max="50" value="20" id="silence-window"
+              oninput="updateSilence(this.value)">
+          </div>
+        </div>
+      </div>
+
+      <div class="section-label">Kalman / Fusion</div>
+      <div class="settings-group">
+        <div class="settings-item">
+          <span class="settings-icon">🔬</span>
+          <div class="settings-text">
+            <div class="settings-label">Bruit process (Q/s)</div>
+            <div class="settings-sub" id="kalman-q-label">0.050</div>
+          </div>
+          <div class="settings-control">
+            <input type="range" min="5" max="200" value="50" id="kalman-q"
+              oninput="updateKalman('Q', this.value)">
+          </div>
+        </div>
+        <div class="settings-item">
+          <span class="settings-icon">📡</span>
+          <div class="settings-text">
+            <div class="settings-label">Bruit mesure GPS (R base)</div>
+            <div class="settings-sub" id="kalman-r-label">0.50</div>
+          </div>
+          <div class="settings-control">
+            <input type="range" min="10" max="200" value="50" id="kalman-r"
+              oninput="updateKalman('R', this.value)">
+          </div>
+        </div>
+      </div>
+
+      <div class="section-label">Alertes</div>
+      <div class="settings-group">
+        <div class="settings-item">
+          <span class="settings-icon">🔔</span>
+          <div class="settings-text">
+            <div class="settings-label">Vibration iPhone</div>
+            <div class="settings-sub">Vibre lors d'un événement</div>
+          </div>
+          <div class="settings-control">
+            <div class="toggle on" id="toggle-haptic" onclick="toggleSetting('haptic')"></div>
+          </div>
+        </div>
+        <div class="settings-item">
+          <span class="settings-icon">📊</span>
+          <div class="settings-text">
+            <div class="settings-label">Anticipation trajet ref.</div>
+            <div class="settings-sub">Alerter sur zones connues</div>
+          </div>
+          <div class="settings-control">
+            <div class="toggle on" id="toggle-anticipation" onclick="toggleSetting('anticipation')"></div>
+          </div>
+        </div>
+        <div class="settings-item">
+          <span class="settings-icon">💡</span>
+          <div class="settings-text">
+            <div class="settings-label">Écran toujours allumé</div>
+            <div class="settings-sub" id="wakelock-sub">Wake Lock pendant la session</div>
+          </div>
+          <div class="settings-control">
+            <div class="toggle on" id="toggle-wakelock" onclick="toggleSetting('wakelock')"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-label">Calibration</div>
+      <div class="settings-group">
+        <div class="settings-item">
+          <span class="settings-icon">🧭</span>
+          <div class="settings-text">
+            <div class="settings-label">Affinage de l'axe</div>
+            <div class="settings-sub" id="refine-sub">Aucun affinage GPS encore</div>
+          </div>
+        </div>
+        <div class="settings-item">
+          <span class="settings-icon">🎯</span>
+          <div class="settings-text">
+            <div class="settings-label">Recalibrer l'axe</div>
+            <div class="settings-sub">Recommencer la calibration statique</div>
+          </div>
+          <div class="settings-control">
+            <button class="btn btn-secondary btn-small" onclick="showCalibration()">Calibrer</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-label">Données</div>
+      <div class="settings-group">
+        <div class="settings-item">
+          <span class="settings-icon">🗑</span>
+          <div class="settings-text">
+            <div class="settings-label">Supprimer le trajet de référence</div>
+            <div class="settings-sub">Action irréversible</div>
+          </div>
+          <div class="settings-control">
+            <button class="btn btn-secondary btn-small" onclick="deleteReference()">Supprimer</button>
+          </div>
+        </div>
+        <div class="settings-item">
+          <span class="settings-icon">🧹</span>
+          <div class="settings-text">
+            <div class="settings-label">Vider l'historique des trajets</div>
+            <div class="settings-sub">Action irréversible</div>
+          </div>
+          <div class="settings-control">
+            <button class="btn btn-secondary btn-small" onclick="clearTrips()">Vider</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════════════════
+// MODULE 1 : CONFIGURATION (avec garde-fous)
+// ═══════════════════════════════════════════════════════════════
+const LIMITS = {
+  ACCEL_THRESHOLD_MIN: 0.15,   // en dessous, le bruit capteur déclenche en boucle
+  BRAKE_THRESHOLD_MIN: 0.15,
+  EVENT_SILENCE_MIN_MS: 1000,
+};
+
+const CONFIG = {
+  ACCEL_THRESHOLD: 0.30,
+  BRAKE_THRESHOLD: 0.30,
+
+  // Filtre passe-bas gravité : alpha proche de 1 = filtre LENT.
+  // gravity ← alpha·gravity + (1-alpha)·raw
+  // alpha = 0.995 à 60 Hz → constante de temps ≈ 3.3 s : une accélération
+  // soutenue de quelques secondes n'est PAS absorbée dans la gravité
+  // (défaut de la v1 où alpha=0.15 tuait le signal en ~100 ms).
+  GRAVITY_ALPHA: 0.995,
+
+  EVENT_SILENCE_MS: 2000,
+  HYSTERESIS_FRAMES: 6,        // ~100 ms à 60 Hz (v1: 50 ms, trop court)
+  MIN_EVENT_SPEED: 1.5,        // m/s — pas d'événement à l'arrêt (claquement de porte…)
+
+  // Gyroscope : au-delà de ce taux de lacet, on est en virage →
+  // détection d'événements et affinage d'axe suspendus
+  TURN_YAW_DPS: 15,
+  TURN_HOLD_MS: 500,
+
+  // Kalman 1D vitesse
+  KALMAN_Q_PER_S: 0.05,        // variance process PAR SECONDE (multipliée par dt)
+  KALMAN_R_BASE: 0.50,         // variance mesure GPS de base, gonflée si précision mauvaise
+  INNOVATION_GATE_SIGMA: 3,    // rejet d'outlier GPS au-delà de 3 sigmas
+  GATE_MAX_REJECTS: 3,         // après 3 rejets consécutifs on ré-accepte (reconvergence)
+
+  // ZUPT (zero-velocity update) & biais accéléromètre
+  STATIONARY_SPEED: 0.5,       // m/s GPS
+  STATIONARY_ACC_MAG: 0.15,    // m/s² moyenne mobile
+  BIAS_ADAPT_RATE: 0.01,
+
+  // Affinage dynamique de l'axe forward via GPS
+  REFINE_MIN_DV_ACC: 0.4,      // m/s² dérivés du GPS pour un échantillon utile
+  REFINE_MIN_SPEED: 2.0,       // m/s
+  REFINE_BLEND: 0.08,          // poids d'un échantillon dans le lissage du forward
+
+  // Distance & trace : filtres anti-bruit GPS
+  MAX_GPS_ACCURACY_M: 25,      // au-delà, point ignoré pour distance/trace
+  MIN_SEG_DISTANCE_M: 5,       // distance mini entre 2 points de trace
+
+  CHART_BUFFER: 120,
+  REFERENCE_ZONE_RADIUS: 50,
+  ANTICIPATION_RADIUS: 200,
+  CALIBRATION_SAMPLES: 300,
+
+  // Score : récupération lente en conduite propre (1 pt / 30 s)
+  SCORE_RECOVERY_PER_S: 1 / 30,
+  RECOVERY_QUIET_MS: 15000,    // il faut 15 s sans événement pour récupérer
+
+  MAX_TRIPS: 10,
+  TRIP_MAX_POINTS: 600,        // downsampling avant stockage localStorage
+};
+
+const LS = {
+  CALIB: 'drivecoach3_calib',
+  REF: 'drivecoach3_ref',
+  TRIPS: 'drivecoach3_trips',
+  SETTINGS: 'drivecoach3_settings',
+};
+
+// ═══════════════════════════════════════════════════════════════
+// MODULE 2 : ÉTAT GLOBAL
+// ═══════════════════════════════════════════════════════════════
+const STATE = {
+  sessionActive: false,
+  permissionsGranted: false,
+  calibrated: false,
+
+  calibMatrix: null,            // { forward: [x,y,z], up: [x,y,z] }
+  refineCount: 0,               // nb d'échantillons GPS ayant affiné le forward
+
+  raw: { ax: 0, ay: 0, az: 0 },
+  gravity: { x: 0, y: 0, z: 0 },
+  gravityInit: false,
+  bias: { x: 0, y: 0, z: 0 },   // biais résiduel estimé à l'arrêt
+  linearAcc: { x: 0, y: 0, z: 0 },
+  longitudinalAcc: 0,
+
+  yawRate: 0,                   // deg/s autour de l'axe vertical véhicule
+  turningUntil: 0,              // timestamp jusqu'auquel on considère être en virage
+  turnedSinceLastFix: false,
+
+  accMagWindow: [],             // fenêtre glissante |linearAcc| pour détection arrêt
+  stationary: false,
+
+  gps: { lat: null, lng: null, speed: null, heading: null, accuracy: 999, timestamp: 0 },
+  gpsError: null,
+  prevFix: null,                // { t, speed } pour dv/dt GPS
+  fixAccSum: { x: 0, y: 0, z: 0, n: 0 },  // accumulation acc linéaire entre 2 fixes
+
+  kalman: { x: 0, P: 1, rejects: 0 },
+  fusedSpeed: 0,
+  lastMotionTs: 0,
+
+  scoreF: 100,                  // score float interne (affiché arrondi)
+  lastAnyEventTime: 0,
+  stats: { accelEvents: 0, brakeEvents: 0, maxSpeed: 0, distance: 0 },
+  lastDistPoint: null,          // dernier point retenu pour distance/trace
+  segPeakAcc: 0,                // pic |acc| depuis le dernier point de trace
+
+  lastEventTime: { accel: 0, brake: 0 },
+  accelHistory: [],
+  speedHistory: [],
+  currentTrip: [],
+  sessionStartTime: 0,
+
+  referenceTrip: null,
+  trips: [],
+
+  settings: { haptic: true, anticipation: true, wakelock: true },
+  wakeLock: null,
+};
+
+// ═══════════════════════════════════════════════════════════════
+// MODULE 3 : MATH PUR (aucune dépendance DOM — testable)
+// ═══════════════════════════════════════════════════════════════
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+const vdot = (a, b) => a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
+const vnorm = a => Math.sqrt(vdot(a, a));
+const vscale = (a, k) => [a[0]*k, a[1]*k, a[2]*k];
+const vadd = (a, b) => [a[0]+b[0], a[1]+b[1], a[2]+b[2]];
+const vsub = (a, b) => [a[0]-b[0], a[1]-b[1], a[2]-b[2]];
+function vunit(a) {
+  const n = vnorm(a);
+  return n > 1e-9 ? vscale(a, 1 / n) : [0, 0, 0];
+}
+/** Orthogonalise a par rapport à u (unitaire) puis normalise (Gram-Schmidt). */
+function orthonormalize(a, u) {
+  return vunit(vsub(a, vscale(u, vdot(a, u))));
+}
+
+/** Distance haversine en km */
+function haversine(lat1, lng1, lat2, lng2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+/**
+ * Score LOCAL d'un segment de trace à partir du pic |acc| observé dessus.
+ * Indépendant du score cumulé de session → la carte reflète la conduite
+ * À CET ENDROIT, pas l'historique (défaut majeur de la v1).
+ */
+function segmentScore(peakAcc, threshold) {
+  const ratio = peakAcc / threshold;
+  if (ratio <= 0.5) return 100;
+  return clamp(Math.round(100 - (ratio - 0.5) * 40), 0, 100);
+}
+
+function scoreToColor(score) {
+  if (score >= 90) return '#22c55e';
+  if (score >= 75) return '#86efac';
+  if (score >= 60) return '#eab308';
+  if (score >= 40) return '#f97316';
+  return '#ef4444';
+}
+
+function getGrade(score) {
+  if (score >= 90) return { grade: 'A', label: 'Conduite douce', color: 'var(--green)' };
+  if (score >= 75) return { grade: 'B', label: 'Bonne conduite', color: '#86efac' };
+  if (score >= 60) return { grade: 'C', label: 'Conduite à améliorer', color: 'var(--yellow)' };
+  if (score >= 40) return { grade: 'D', label: 'Conduite agressive', color: 'var(--orange)' };
+  return { grade: 'F', label: 'Très agressif', color: 'var(--red)' };
+}
+
+/** Pénalité d'un événement selon sa sévérité relative au seuil. */
+function eventPenalty(value, threshold) {
+  const severity = Math.abs(value) / threshold;
+  return Math.min(10, Math.round(severity * 3));
+}
+
+/** Downsample uniforme d'un tableau de points à maxN éléments. */
+function downsample(points, maxN) {
+  if (points.length <= maxN) return points;
+  const out = [];
+  const step = points.length / maxN;
+  for (let i = 0; i < maxN; i++) out.push(points[Math.floor(i * step)]);
+  return out;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MODULE 4 : PERMISSIONS (avec gestion d'erreur visible + retry)
+// ═══════════════════════════════════════════════════════════════
+async function requestPermissions() {
+  const errEl = document.getElementById('perm-error');
+  errEl.style.display = 'none';
+
+  try {
+    if (typeof DeviceMotionEvent !== 'undefined' &&
+        typeof DeviceMotionEvent.requestPermission === 'function') {
+      const motionPerm = await DeviceMotionEvent.requestPermission();
+      if (motionPerm !== 'granted') {
+        errEl.textContent = 'Permission capteurs refusée. Va dans Réglages > Safari > Mouvement et orientation, puis réessaie.';
+        errEl.style.display = 'block';
+        document.getElementById('perm-btn').textContent = 'Réessayer';
+        return;
+      }
+    }
+
+    const geoOk = await new Promise((resolve) => {
+      navigator.geolocation.getCurrentPosition(
+        () => resolve(true),
+        (err) => { STATE.gpsError = err.message; resolve(false); },
+        { enableHighAccuracy: true, timeout: 8000 }
+      );
+    });
+
+    if (!geoOk) {
+      errEl.textContent = 'GPS indisponible (' + (STATE.gpsError || 'inconnu') + '). L\'app fonctionnera en mode dégradé (capteurs seuls).';
+      errEl.style.display = 'block';
+      // on continue quand même : les capteurs de mouvement restent utiles
+    }
+
+    STATE.permissionsGranted = true;
+    document.getElementById('permission-screen').style.display = 'none';
+
+    if (STATE.calibrated) {
+      startAllSensors();
+    } else {
+      showCalibration();
+    }
+  } catch (err) {
+    errEl.textContent = 'Erreur permissions : ' + err.message;
+    errEl.style.display = 'block';
+    document.getElementById('perm-btn').textContent = 'Réessayer';
+  }
+}
+
+function startAllSensors() {
+  startMotionListener();
+  startGPS();
+  startUILoop();
+  initMap();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MODULE 5 : ACQUISITION CAPTEURS (accéléromètre + gyroscope)
+// ═══════════════════════════════════════════════════════════════
+function startMotionListener() {
+  window.addEventListener('devicemotion', handleMotion, { passive: true });
+}
+function stopMotionListener() {
+  window.removeEventListener('devicemotion', handleMotion);
+}
+
+function handleMotion(event) {
+  const g = event.accelerationIncludingGravity;
+  if (!g) return;
+
+  const now = performance.now();
+  let dt = (now - STATE.lastMotionTs) / 1000;
+  STATE.lastMotionTs = now;
+  if (!(dt > 0.001 && dt < 0.2)) dt = 1 / 60;
+
+  STATE.raw.ax = g.x || 0;
+  STATE.raw.ay = g.y || 0;
+  STATE.raw.az = g.z || 0;
+
+  // ── Gravité : filtre passe-bas LENT (voir CONFIG.GRAVITY_ALPHA) ──
+  if (!STATE.gravityInit) {
+    STATE.gravity.x = STATE.raw.ax;
+    STATE.gravity.y = STATE.raw.ay;
+    STATE.gravity.z = STATE.raw.az;
+    STATE.gravityInit = true;
+  } else {
+    const a = CONFIG.GRAVITY_ALPHA;
+    STATE.gravity.x = a * STATE.gravity.x + (1 - a) * STATE.raw.ax;
+    STATE.gravity.y = a * STATE.gravity.y + (1 - a) * STATE.raw.ay;
+    STATE.gravity.z = a * STATE.gravity.z + (1 - a) * STATE.raw.az;
+  }
+
+  // Accélération linéaire = brut - gravité - biais estimé
+  STATE.linearAcc.x = STATE.raw.ax - STATE.gravity.x - STATE.bias.x;
+  STATE.linearAcc.y = STATE.raw.ay - STATE.gravity.y - STATE.bias.y;
+  STATE.linearAcc.z = STATE.raw.az - STATE.gravity.z - STATE.bias.z;
+
+  // ── Gyroscope : taux de lacet autour de l'axe vertical du VÉHICULE ──
+  // rotationRate : alpha = axe Z tel., beta = X, gamma = Y (deg/s)
+  if (event.rotationRate && STATE.calibMatrix) {
+    const r = [event.rotationRate.beta || 0, event.rotationRate.gamma || 0, event.rotationRate.alpha || 0];
+    STATE.yawRate = vdot(r, STATE.calibMatrix.up);
+    if (Math.abs(STATE.yawRate) > CONFIG.TURN_YAW_DPS) {
+      STATE.turningUntil = Date.now() + CONFIG.TURN_HOLD_MS;
+      STATE.turnedSinceLastFix = true;
+    }
+  }
+
+  // ── Projection longitudinale ──
+  if (STATE.calibMatrix) {
+    const f = STATE.calibMatrix.forward;
+    STATE.longitudinalAcc =
+      STATE.linearAcc.x * f[0] + STATE.linearAcc.y * f[1] + STATE.linearAcc.z * f[2];
+  } else {
+    STATE.longitudinalAcc = STATE.linearAcc.y;
+  }
+
+  // ── Détection d'arrêt (ZUPT) + adaptation du biais ──
+  const mag = Math.sqrt(
+    STATE.linearAcc.x ** 2 + STATE.linearAcc.y ** 2 + STATE.linearAcc.z ** 2);
+  STATE.accMagWindow.push(mag);
+  if (STATE.accMagWindow.length > 60) STATE.accMagWindow.shift();
+  const meanMag = STATE.accMagWindow.reduce((s, v) => s + v, 0) / STATE.accMagWindow.length;
+
+  const gpsSaysStopped = STATE.gps.speed !== null && STATE.gps.speed < CONFIG.STATIONARY_SPEED;
+  STATE.stationary = gpsSaysStopped && meanMag < CONFIG.STATIONARY_ACC_MAG;
+
+  if (STATE.stationary) {
+    // Zero-velocity update : la vitesse fusionnée ne peut pas dériver à l'arrêt
+    STATE.kalman.x *= 0.5;
+    if (Math.abs(STATE.kalman.x) < 0.05) STATE.kalman.x = 0;
+    // Le résidu d'accélération à l'arrêt EST le biais → adaptation lente
+    const k = CONFIG.BIAS_ADAPT_RATE;
+    STATE.bias.x += k * (STATE.raw.ax - STATE.gravity.x - STATE.bias.x);
+    STATE.bias.y += k * (STATE.raw.ay - STATE.gravity.y - STATE.bias.y);
+    STATE.bias.z += k * (STATE.raw.az - STATE.gravity.z - STATE.bias.z);
+  }
+
+  // Accumulation pour l'affinage d'axe au prochain fix GPS
+  STATE.fixAccSum.x += STATE.linearAcc.x;
+  STATE.fixAccSum.y += STATE.linearAcc.y;
+  STATE.fixAccSum.z += STATE.linearAcc.z;
+  STATE.fixAccSum.n++;
+
+  // Pic local pour le score de segment de la carte
+  STATE.segPeakAcc = Math.max(STATE.segPeakAcc, Math.abs(STATE.longitudinalAcc));
+
+  kalmanPredict(STATE.longitudinalAcc, dt);
+
+  if (STATE.sessionActive) detectDrivingEvents();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MODULE 6 : CALIBRATION STATIQUE
+// ═══════════════════════════════════════════════════════════════
+let calSamples = [];
+let calTimer = null;
+
+function showCalibration() {
+  document.getElementById('calibration-screen').style.display = 'flex';
+}
+
+function startCalibration() {
+  calSamples = [];
+  document.getElementById('cal-btn').disabled = true;
+  document.getElementById('cal-btn').textContent = 'Calibration en cours...';
+
+  window.addEventListener('devicemotion', collectCalibrationSample, { passive: true });
+
+  calTimer = setInterval(() => {
+    const progress = calSamples.length / CONFIG.CALIBRATION_SAMPLES;
+    document.getElementById('cal-bar').style.width = (progress * 100) + '%';
+
+    if (calSamples.length >= CONFIG.CALIBRATION_SAMPLES) {
+      clearInterval(calTimer);
+      window.removeEventListener('devicemotion', collectCalibrationSample);
+      finishCalibration();
+    }
+  }, 100);
+}
+
+function collectCalibrationSample(event) {
+  const g = event.accelerationIncludingGravity;
+  if (!g) return;
+  calSamples.push({ x: g.x || 0, y: g.y || 0, z: g.z || 0 });
+
+  if (calSamples.length % 30 === 0) {
+    const n = calSamples.length;
+    const mx = calSamples.reduce((s, v) => s + v.x, 0) / n;
+    const my = calSamples.reduce((s, v) => s + v.y, 0) / n;
+    const mz = calSamples.reduce((s, v) => s + v.z, 0) / n;
+    // variance : mesure la stabilité du téléphone pendant la calibration
+    const varSum = calSamples.reduce((s, v) =>
+      s + (v.x - mx) ** 2 + (v.y - my) ** 2 + (v.z - mz) ** 2, 0) / n;
+    document.getElementById('cal-x').textContent = mx.toFixed(3) + ' m/s²';
+    document.getElementById('cal-y').textContent = my.toFixed(3) + ' m/s²';
+    document.getElementById('cal-z').textContent = mz.toFixed(3) + ' m/s²';
+    document.getElementById('cal-stab').textContent =
+      varSum < 0.05 ? '✅ stable' : '⚠️ bouge trop';
+  }
+}
+
+function finishCalibration() {
+  const n = calSamples.length;
+  const gx = calSamples.reduce((s, v) => s + v.x, 0) / n;
+  const gy = calSamples.reduce((s, v) => s + v.y, 0) / n;
+  const gz = calSamples.reduce((s, v) => s + v.z, 0) / n;
+
+  // Si le téléphone a trop bougé, on refuse la calibration
+  const varSum = calSamples.reduce((s, v) =>
+    s + (v.x - gx) ** 2 + (v.y - gy) ** 2 + (v.z - gz) ** 2, 0) / n;
+  if (varSum > 0.2) {
+    document.getElementById('cal-btn').disabled = false;
+    document.getElementById('cal-btn').textContent = 'Trop de mouvement — réessayer';
+    return;
+  }
+
+  const upVec = vunit([-gx, -gy, -gz]);
+
+  // forward initial = hypothèse (axe Y iPhone orthogonalisé) — sera AFFINÉ
+  // en roulant par refineForwardAxis() dès les premières variations de vitesse GPS
+  const fw = orthonormalize([0, 1, 0], upVec);
+
+  STATE.calibMatrix = { forward: fw, up: upVec };
+  STATE.calibrated = true;
+  STATE.refineCount = 0;
+  STATE.gravity = { x: gx, y: gy, z: gz };  // filtre gravité initialisé convergé
+  STATE.gravityInit = true;
+  STATE.bias = { x: 0, y: 0, z: 0 };
+
+  persistCalib();
+
+  document.getElementById('calibration-screen').style.display = 'none';
+  document.getElementById('cal-btn').disabled = false;
+  document.getElementById('cal-btn').textContent = 'Démarrer la calibration';
+  startAllSensors();
+}
+
+function persistCalib() {
+  try {
+    localStorage.setItem(LS.CALIB, JSON.stringify({
+      matrix: STATE.calibMatrix,
+      refineCount: STATE.refineCount,
+    }));
+  } catch (e) {}
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MODULE 7 : AFFINAGE DYNAMIQUE DE L'AXE FORWARD (réellement implémenté)
+// ═══════════════════════════════════════════════════════════════
+/**
+ * À chaque fix GPS : si la vitesse GPS a varié franchement (|dv/dt| élevé)
+ * SANS virage pendant l'intervalle, alors le vecteur moyen d'accélération
+ * linéaire mesuré par l'accéléromètre sur cet intervalle pointe vers
+ * l'avant (si accélération) ou l'arrière (si freinage) du véhicule.
+ * On le réinjecte par lissage exponentiel dans calibMatrix.forward.
+ */
+function refineForwardAxis(dvGps, dt) {
+  if (!STATE.calibMatrix || STATE.fixAccSum.n < 10) return;
+  const aGps = dvGps / dt;
+  if (Math.abs(aGps) < CONFIG.REFINE_MIN_DV_ACC) return;
+  if (STATE.turnedSinceLastFix) return;
+  if ((STATE.gps.speed || 0) < CONFIG.REFINE_MIN_SPEED) return;
+
+  const mean = [
+    STATE.fixAccSum.x / STATE.fixAccSum.n,
+    STATE.fixAccSum.y / STATE.fixAccSum.n,
+    STATE.fixAccSum.z / STATE.fixAccSum.n,
+  ];
+  // signe : en freinage le vecteur mesuré pointe vers l'arrière → on retourne
+  const cand = orthonormalize(vscale(mean, Math.sign(aGps)), STATE.calibMatrix.up);
+  if (vnorm(cand) < 0.5) return;  // dégénéré (acc quasi verticale)
+
+  const w = CONFIG.REFINE_BLEND;
+  const blended = vadd(vscale(STATE.calibMatrix.forward, 1 - w), vscale(cand, w));
+  STATE.calibMatrix.forward = orthonormalize(blended, STATE.calibMatrix.up);
+  STATE.refineCount++;
+  if (STATE.refineCount % 10 === 0) persistCalib();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MODULE 8 : KALMAN 1D VITESSE (Q·dt, R adaptatif, rejet d'outliers, ZUPT)
+// ═══════════════════════════════════════════════════════════════
+function kalmanPredict(acc, dt) {
+  STATE.kalman.x += acc * dt;
+  if (STATE.kalman.x < 0) STATE.kalman.x = 0;
+  STATE.kalman.P += CONFIG.KALMAN_Q_PER_S * dt;   // Q proportionnel à dt (v1: Q fixe par frame)
+  STATE.fusedSpeed = STATE.kalman.x;
+}
+
+function kalmanUpdate(speedGPS, accuracy) {
+  // R adaptatif : plus la précision GPS est mauvaise, moins on lui fait confiance
+  const accFactor = Math.max(1, accuracy / 10);
+  const R = CONFIG.KALMAN_R_BASE * accFactor * accFactor;
+
+  // Rejet d'outlier : gate d'innovation à N sigmas
+  const innov = speedGPS - STATE.kalman.x;
+  const S = STATE.kalman.P + R;
+  if (innov * innov > CONFIG.INNOVATION_GATE_SIGMA ** 2 * S) {
+    STATE.kalman.rejects++;
+    // après plusieurs rejets consécutifs, la mesure a probablement raison
+    // (le filtre a divergé) → on ré-accepte pour reconverger
+    if (STATE.kalman.rejects < CONFIG.GATE_MAX_REJECTS) return;
+  }
+  STATE.kalman.rejects = 0;
+
+  const K = STATE.kalman.P / S;
+  STATE.kalman.x += K * innov;
+  if (STATE.kalman.x < 0) STATE.kalman.x = 0;
+  STATE.kalman.P = (1 - K) * STATE.kalman.P;
+  STATE.fusedSpeed = STATE.kalman.x;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MODULE 9 : GPS
+// ═══════════════════════════════════════════════════════════════
+let gpsWatchId = null;
+
+function startGPS() {
+  if (!navigator.geolocation) return;
+  if (gpsWatchId !== null) return;
+  gpsWatchId = navigator.geolocation.watchPosition(
+    handleGPS,
+    (err) => {
+      STATE.gpsError = err.message;
+      document.getElementById('status-dot').className = 'status-dot error';
+      document.getElementById('status-text').textContent = 'GPS : ' + err.message;
+    },
+    { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 }
+  );
+}
+
+function stopGPS() {
+  if (gpsWatchId !== null) {
+    navigator.geolocation.clearWatch(gpsWatchId);
+    gpsWatchId = null;
+  }
+}
+
+function handleGPS(pos) {
+  const c = pos.coords;
+  STATE.gpsError = null;
+  STATE.gps.lat = c.latitude;
+  STATE.gps.lng = c.longitude;
+  STATE.gps.accuracy = Math.round(c.accuracy);
+  STATE.gps.speed = (c.speed !== null && c.speed >= 0) ? c.speed : null;
+  STATE.gps.heading = c.heading;
+  STATE.gps.timestamp = pos.timestamp;
+
+  // ── Fusion Kalman + affinage d'axe ──
+  if (STATE.gps.speed !== null) {
+    kalmanUpdate(STATE.gps.speed, c.accuracy);
+
+    if (STATE.prevFix) {
+      const dt = (pos.timestamp - STATE.prevFix.t) / 1000;
+      if (dt > 0.3 && dt < 3 && STATE.prevFix.speed !== null) {
+        refineForwardAxis(STATE.gps.speed - STATE.prevFix.speed, dt);
+      }
+    }
+    STATE.prevFix = { t: pos.timestamp, speed: STATE.gps.speed };
+  }
+  // reset accumulateurs d'intervalle
+  STATE.fixAccSum = { x: 0, y: 0, z: 0, n: 0 };
+  STATE.turnedSinceLastFix = false;
+
+  const speedKmh = STATE.fusedSpeed * 3.6;
+  if (STATE.sessionActive && speedKmh > STATE.stats.maxSpeed) STATE.stats.maxSpeed = speedKmh;
+
+  // ── Distance & trace : filtrées par précision et distance minimale ──
+  // (v1 : chaque fix comptait → le bruit GPS à l'arrêt gonflait la distance)
+  const accuracyOk = c.accuracy <= CONFIG.MAX_GPS_ACCURACY_M;
+  if (accuracyOk) {
+    if (STATE.lastDistPoint === null) {
+      STATE.lastDistPoint = { lat: c.latitude, lng: c.longitude };
+      updateMapPosition(c.latitude, c.longitude);
+    } else {
+      const dKm = haversine(STATE.lastDistPoint.lat, STATE.lastDistPoint.lng, c.latitude, c.longitude);
+      const dM = dKm * 1000;
+      const minDist = Math.max(CONFIG.MIN_SEG_DISTANCE_M, c.accuracy / 2);
+      if (dM >= minDist) {
+        if (STATE.sessionActive) {
+          STATE.stats.distance += dKm;
+          // couleur du segment = score LOCAL basé sur le pic d'acc du segment
+          const segScore = segmentScore(STATE.segPeakAcc, CONFIG.ACCEL_THRESHOLD);
+          addMapSegment(STATE.lastDistPoint, { lat: c.latitude, lng: c.longitude }, segScore);
+        }
+        STATE.lastDistPoint = { lat: c.latitude, lng: c.longitude };
+        STATE.segPeakAcc = 0;
+      }
+      updateMapPosition(c.latitude, c.longitude);
+    }
+  }
+
+  // ── Enregistrement trajet (1 Hz) ──
+  if (STATE.sessionActive) {
+    STATE.currentTrip.push({
+      ts: pos.timestamp,
+      lat: c.latitude,
+      lng: c.longitude,
+      speed: STATE.fusedSpeed,
+      acc: STATE.longitudinalAcc,
+      accuracy: c.accuracy,
+      heading: c.heading,
+    });
+    checkProximityToReferenceZones();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MODULE 10 : DÉTECTION D'ÉVÉNEMENTS (hystérésis + virage + vitesse mini)
+// ═══════════════════════════════════════════════════════════════
+let accelFrames = 0;
+let brakeFrames = 0;
+
+function detectDrivingEvents() {
+  // Pas de détection à l'arrêt ni en virage (force latérale mal projetée)
+  if (STATE.fusedSpeed < CONFIG.MIN_EVENT_SPEED) { accelFrames = 0; brakeFrames = 0; return; }
+  if (Date.now() < STATE.turningUntil) { accelFrames = 0; brakeFrames = 0; return; }
+
+  const acc = STATE.longitudinalAcc;
+  const now = Date.now();
+
+  if (acc > CONFIG.ACCEL_THRESHOLD) {
+    accelFrames++; brakeFrames = 0;
+  } else if (acc < -CONFIG.BRAKE_THRESHOLD) {
+    brakeFrames++; accelFrames = 0;
+  } else {
+    accelFrames = 0; brakeFrames = 0;
+  }
+
+  if (accelFrames >= CONFIG.HYSTERESIS_FRAMES &&
+      now - STATE.lastEventTime.accel > CONFIG.EVENT_SILENCE_MS) {
+    STATE.lastEventTime.accel = now;
+    accelFrames = 0;
+    onDrivingEvent('accel', acc);
+  }
+
+  if (brakeFrames >= CONFIG.HYSTERESIS_FRAMES &&
+      now - STATE.lastEventTime.brake > CONFIG.EVENT_SILENCE_MS) {
+    STATE.lastEventTime.brake = now;
+    brakeFrames = 0;
+    onDrivingEvent('brake', acc);
+  }
+}
+
+function onDrivingEvent(type, value) {
+  const threshold = type === 'accel' ? CONFIG.ACCEL_THRESHOLD : CONFIG.BRAKE_THRESHOLD;
+  const penalty = eventPenalty(value, threshold);
+
+  STATE.scoreF = Math.max(0, STATE.scoreF - penalty);
+  STATE.lastAnyEventTime = Date.now();
+
+  if (type === 'accel') {
+    STATE.stats.accelEvents++;
+    addEvent('accel', 'Accélération brusque', `${value.toFixed(2)} m/s² · -${penalty} pts`);
+  } else {
+    STATE.stats.brakeEvents++;
+    addEvent('brake', 'Freinage franc', `${Math.abs(value).toFixed(2)} m/s² · -${penalty} pts`);
+  }
+
+  if (STATE.settings.haptic && navigator.vibrate) {
+    navigator.vibrate(type === 'brake' ? [100, 50, 100] : [150]);
+  }
+
+  showAlert(
+    type === 'brake' ? 'warning' : 'danger',
+    type === 'brake' ? '⚠ Freinage franc détecté' : '⚡ Accélération brusque détectée'
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MODULE 11 : TRAJET DE RÉFÉRENCE & ZONES
+// ═══════════════════════════════════════════════════════════════
+function extractProblematicZones(tripPoints) {
+  const events = tripPoints.filter(p => Math.abs(p.acc) > CONFIG.ACCEL_THRESHOLD);
+  const zones = [];
+  events.forEach(pt => {
+    const existing = zones.find(z =>
+      haversine(z.lat, z.lng, pt.lat, pt.lng) * 1000 < CONFIG.REFERENCE_ZONE_RADIUS);
+    if (existing) {
+      existing.count++;
+      existing.avgAcc = (existing.avgAcc * (existing.count - 1) + pt.acc) / existing.count;
+    } else {
+      zones.push({ lat: pt.lat, lng: pt.lng, type: pt.acc > 0 ? 'accel' : 'brake', avgAcc: pt.acc, count: 1 });
+    }
+  });
+  return zones.filter(z => z.count >= 2);
+}
+
+let lastZoneAlertTime = 0;
+function checkProximityToReferenceZones() {
+  if (!STATE.settings.anticipation) return;
+  if (!STATE.referenceTrip?.zones?.length) return;
+  if (STATE.gps.lat === null) return;
+  const now = Date.now();
+  if (now - lastZoneAlertTime < 10000) return;  // anti-spam d'alertes
+
+  for (const zone of STATE.referenceTrip.zones) {
+    const dist = haversine(STATE.gps.lat, STATE.gps.lng, zone.lat, zone.lng) * 1000;
+    if (dist < CONFIG.ANTICIPATION_RADIUS && dist > CONFIG.REFERENCE_ZONE_RADIUS) {
+      const type = zone.type === 'brake' ? '🛑 Zone de freinage connue' : '⚡ Zone d\'accélération connue';
+      showAlert('info', `${type} dans ~${Math.round(dist)} m`, 4000);
+      lastZoneAlertTime = now;
+      break;
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MODULE 12 : SESSION + WAKE LOCK
+// ═══════════════════════════════════════════════════════════════
+async function acquireWakeLock() {
+  if (!STATE.settings.wakelock) return;
+  if (!('wakeLock' in navigator)) {
+    document.getElementById('wakelock-sub').textContent = 'Non supporté par ce navigateur';
+    return;
+  }
+  try {
+    STATE.wakeLock = await navigator.wakeLock.request('screen');
+    document.getElementById('wakelock-sub').textContent = 'Actif — écran maintenu allumé';
+    STATE.wakeLock.addEventListener('release', () => {
+      document.getElementById('wakelock-sub').textContent = 'Relâché (écran verrouillé ?)';
+    });
+  } catch (e) {
+    document.getElementById('wakelock-sub').textContent = 'Refusé : ' + e.message;
+  }
+}
+
+function releaseWakeLock() {
+  if (STATE.wakeLock) {
+    STATE.wakeLock.release().catch(() => {});
+    STATE.wakeLock = null;
+    document.getElementById('wakelock-sub').textContent = 'Wake Lock pendant la session';
+  }
+}
+
+// Reprise après retour au premier plan : wake lock + GPS
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && STATE.sessionActive) {
+    acquireWakeLock();
+    stopGPS();
+    startGPS();
+    showAlert('info', 'Session reprise — capteurs réactivés', 3000);
+  }
+});
+
+function toggleSession() {
+  STATE.sessionActive ? stopSession() : startSession();
+}
+
+function startSession() {
+  STATE.sessionActive = true;
+  STATE.scoreF = 100;
+  STATE.lastAnyEventTime = 0;
+  STATE.stats = { accelEvents: 0, brakeEvents: 0, maxSpeed: 0, distance: 0 };
+  STATE.currentTrip = [];
+  STATE.accelHistory = [];
+  STATE.speedHistory = [];
+  STATE.kalman = { x: STATE.gps.speed || 0, P: 1, rejects: 0 };
+  STATE.sessionStartTime = Date.now();
+  STATE.lastDistPoint = null;
+  STATE.segPeakAcc = 0;
+  clearMapTrace();
+  acquireWakeLock();
+
+  document.getElementById('main-btn').textContent = '⏹ Arrêter la session';
+  document.getElementById('main-btn').className = 'btn btn-danger';
+  document.getElementById('status-dot').className = 'status-dot active';
+  document.getElementById('status-text').textContent = 'En session';
+}
+
+function stopSession() {
+  STATE.sessionActive = false;
+  releaseWakeLock();
+
+  document.getElementById('main-btn').textContent = '▶ Démarrer la session';
+  document.getElementById('main-btn').className = 'btn btn-primary';
+  document.getElementById('status-dot').className = 'status-dot';
+  document.getElementById('status-text').textContent = 'Arrêté';
+
+  if (STATE.currentTrip.length > 30) {
+    document.getElementById('save-ref-btn').style.display = 'block';
+    saveTripToHistory();
+  }
+
+  renderTripCharts();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MODULE 13 : HISTORIQUE DES TRAJETS + EXPORT (v1 : un seul trajet, tout écrasé)
+// ═══════════════════════════════════════════════════════════════
+function buildTripRecord() {
+  return {
+    id: Date.now().toString(),
+    date: new Date().toISOString(),
+    points: downsample(STATE.currentTrip, CONFIG.TRIP_MAX_POINTS),
+    zones: extractProblematicZones(STATE.currentTrip),
+    stats: {
+      ...STATE.stats,
+      score: Math.round(STATE.scoreF),
+      duration: Date.now() - STATE.sessionStartTime,
+    },
+  };
+}
+
+function saveTripToHistory() {
+  const trip = buildTripRecord();
+  STATE.trips.unshift(trip);
+  while (STATE.trips.length > CONFIG.MAX_TRIPS) STATE.trips.pop();
+  persistTrips();
+  showAlert('info', '✅ Trajet enregistré dans l\'historique', 3000);
+}
+
+function persistTrips() {
+  try {
+    localStorage.setItem(LS.TRIPS, JSON.stringify(STATE.trips));
+  } catch (e) {
+    // quota localStorage dépassé → on retire le plus vieux et on retente
+    if (STATE.trips.length > 1) {
+      STATE.trips.pop();
+      persistTrips();
+    }
+  }
+}
+
+function saveAsReference() {
+  const ref = buildTripRecord();
+  STATE.referenceTrip = ref;
+  try { localStorage.setItem(LS.REF, JSON.stringify(ref)); } catch (e) {}
+  renderReferencePanel();
+  showAlert('info', `✅ Trajet de référence sauvegardé · ${ref.zones.length} zones détectées`, 4000);
+}
+
+function setTripAsReference(id) {
+  const trip = STATE.trips.find(t => t.id === id);
+  if (!trip) return;
+  STATE.referenceTrip = trip;
+  try { localStorage.setItem(LS.REF, JSON.stringify(trip)); } catch (e) {}
+  renderReferencePanel();
+  showAlert('info', '✅ Trajet défini comme référence', 3000);
+}
+
+function exportTrip(id) {
+  const trip = id === 'ref' ? STATE.referenceTrip : STATE.trips.find(t => t.id === id);
+  if (!trip) return;
+  const blob = new Blob([JSON.stringify(trip, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `drivecoach-trajet-${trip.date.slice(0, 19).replace(/[T:]/g, '-')}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+function deleteTrip(id) {
+  STATE.trips = STATE.trips.filter(t => t.id !== id);
+  persistTrips();
+  renderTripsList();
+}
+
+function clearTrips() {
+  if (!confirm('Vider l\'historique des trajets ?')) return;
+  STATE.trips = [];
+  persistTrips();
+  renderTripsList();
+}
+
+function deleteReference() {
+  if (!confirm('Supprimer le trajet de référence ?')) return;
+  STATE.referenceTrip = null;
+  localStorage.removeItem(LS.REF);
+  renderReferencePanel();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MODULE 14 : BOUCLE UI (10 Hz) — lecture seule de STATE
+// ═══════════════════════════════════════════════════════════════
+let uiInterval = null;
+
+function startUILoop() {
+  if (uiInterval) clearInterval(uiInterval);
+  uiInterval = setInterval(updateUI, 100);
+}
+
+function updateUI() {
+  const acc = STATE.longitudinalAcc;
+  const speed = STATE.fusedSpeed * 3.6;
+
+  // Récupération lente du score en conduite propre
+  if (STATE.sessionActive && STATE.scoreF < 100 &&
+      Date.now() - STATE.lastAnyEventTime > CONFIG.RECOVERY_QUIET_MS) {
+    STATE.scoreF = Math.min(100, STATE.scoreF + CONFIG.SCORE_RECOVERY_PER_S * 0.1);
+  }
+
+  document.getElementById('speed-val').textContent = Math.round(speed);
+  document.getElementById('accel-val').textContent = acc.toFixed(2);
+  document.getElementById('gps-acc').textContent = STATE.gps.accuracy < 999 ? STATE.gps.accuracy : '—';
+
+  // État capteurs synthétique
+  const sensorParts = [];
+  if (STATE.stationary) sensorParts.push('🅿️ arrêt');
+  else if (Date.now() < STATE.turningUntil) sensorParts.push('↩️ virage');
+  else sensorParts.push('🚗 roule');
+  sensorParts.push(STATE.refineCount > 0 ? `axe ✓${STATE.refineCount}` : 'axe ~');
+  document.getElementById('sensor-state').textContent = sensorParts.join(' · ');
+
+  document.getElementById('speed-bar').style.width = Math.min(100, speed / 1.5) + '%';
+  const accPct = Math.min(100, (Math.abs(acc) / 2) * 100);
+  const accColor = Math.abs(acc) < CONFIG.ACCEL_THRESHOLD ? 'var(--green)' :
+                   Math.abs(acc) < CONFIG.ACCEL_THRESHOLD * 2 ? 'var(--orange)' : 'var(--red)';
+  document.getElementById('accel-bar').style.width = accPct + '%';
+  document.getElementById('accel-bar').style.background = accColor;
+  document.getElementById('gps-bar').style.width = Math.max(0, 100 - STATE.gps.accuracy * 2) + '%';
+
+  const needlePct = clamp((acc / 3 + 0.5) * 100, 0, 100);
+  const needle = document.getElementById('accel-needle');
+  needle.style.left = needlePct + '%';
+  needle.style.background = Math.abs(acc) > CONFIG.ACCEL_THRESHOLD ?
+    (acc > 0 ? 'var(--red)' : 'var(--orange)') : 'var(--text)';
+  document.getElementById('accel-gauge-val').textContent = acc.toFixed(3);
+
+  const score = Math.round(STATE.scoreF);
+  const g = getGrade(score);
+  const ring = document.getElementById('score-ring');
+  ring.style.strokeDashoffset = 251.3 * (1 - score / 100);
+  ring.style.stroke = g.color;
+  document.getElementById('score-val').textContent = score;
+  document.getElementById('score-grade').textContent = g.grade;
+  document.getElementById('score-grade').style.color = g.color;
+  document.getElementById('score-label').textContent = g.label;
+
+  document.getElementById('trip-accel-events').textContent = STATE.stats.accelEvents;
+  document.getElementById('trip-brake-events').textContent = STATE.stats.brakeEvents;
+  document.getElementById('trip-max-speed').textContent = Math.round(STATE.stats.maxSpeed);
+  document.getElementById('trip-distance').textContent = STATE.stats.distance.toFixed(2);
+
+  if (!STATE.gpsError) {
+    if (STATE.gps.accuracy > 20) {
+      document.getElementById('status-dot').className = 'status-dot' + (STATE.sessionActive ? ' warning' : '');
+      if (STATE.sessionActive) document.getElementById('status-text').textContent = 'GPS imprécis';
+    } else if (STATE.sessionActive) {
+      document.getElementById('status-dot').className = 'status-dot active';
+      document.getElementById('status-text').textContent = 'En session';
+    }
+  }
+
+  if (STATE.sessionActive) {
+    STATE.accelHistory.push(acc);
+    STATE.speedHistory.push(speed);
+    if (STATE.accelHistory.length > CONFIG.CHART_BUFFER) STATE.accelHistory.shift();
+    if (STATE.speedHistory.length > CONFIG.CHART_BUFFER) STATE.speedHistory.shift();
+    renderLiveCharts();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MODULE 15 : CHARTS CANVAS
+// ═══════════════════════════════════════════════════════════════
+function renderLiveCharts() {
+  drawChart('accel-chart', STATE.accelHistory, -2, 2, '#3b82f6', CONFIG.ACCEL_THRESHOLD, '#ef4444');
+  drawChart('speed-chart', STATE.speedHistory, 0, 130, '#22c55e');
+}
+
+function renderTripCharts() {
+  const accData = STATE.currentTrip.map(p => p.acc);
+  const spdData = STATE.currentTrip.map(p => p.speed * 3.6);
+  drawChart('accel-chart', accData, -2, 2, '#3b82f6', CONFIG.ACCEL_THRESHOLD, '#ef4444');
+  drawChart('speed-chart', spdData, 0, 130, '#22c55e');
+}
+
+function drawChart(canvasId, data, yMin, yMax, color, thresholdAbs, threshColor) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.offsetWidth || 300;
+  const h = canvas.offsetHeight || 120;
+
+  if (canvas.width !== w * dpr) {
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+  }
+
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+
+  if (!data.length) { ctx.setTransform(1, 0, 0, 1, 0, 0); return; }
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+  ctx.lineWidth = 0.5;
+  for (let i = 0; i <= 4; i++) {
+    const y = (h / 4) * i;
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+  }
+
+  const mapY = val => h - ((val - yMin) / (yMax - yMin)) * h;
+
+  if (thresholdAbs !== undefined) {
+    ctx.strokeStyle = threshColor + '60';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath(); ctx.moveTo(0, mapY(thresholdAbs)); ctx.lineTo(w, mapY(thresholdAbs)); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, mapY(-thresholdAbs)); ctx.lineTo(w, mapY(-thresholdAbs)); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  const step = w / Math.max(1, data.length - 1);
+  data.forEach((val, i) => {
+    const x = i * step;
+    const y = mapY(val);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+
+  if (yMin < 0 && yMax > 0) {
+    ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+    ctx.lineWidth = 0.5;
+    ctx.beginPath(); ctx.moveTo(0, mapY(0)); ctx.lineTo(w, mapY(0)); ctx.stroke();
+  }
+
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MODULE 16 : CARTE GPS (couleur = score de SEGMENT, pas score cumulé)
+// ═══════════════════════════════════════════════════════════════
+let gpsMap = null;
+let gpsMapMarker = null;
+let gpsMapPolylines = [];
+
+function initMap() {
+  if (gpsMap) return;
+  gpsMap = L.map('gps-map', { zoomControl: false, attributionControl: false })
+    .setView([48.8566, 2.3522], 15);
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    maxZoom: 19,
+    subdomains: 'abcd',
+  }).addTo(gpsMap);
+
+  gpsMapMarker = L.circleMarker([48.8566, 2.3522], {
+    radius: 8, fillColor: '#3b82f6', color: 'white',
+    weight: 2.5, opacity: 1, fillOpacity: 1,
+  }).addTo(gpsMap);
+}
+
+function updateMapPosition(lat, lng) {
+  if (!gpsMap) initMap();
+  gpsMapMarker.setLatLng([lat, lng]);
+  gpsMap.setView([lat, lng], gpsMap.getZoom(), { animate: true, duration: 0.5 });
+}
+
+function addMapSegment(from, to, segScore) {
+  if (!gpsMap) return;
+  const seg = L.polyline(
+    [[from.lat, from.lng], [to.lat, to.lng]],
+    { color: scoreToColor(segScore), weight: 5, opacity: 0.85, lineCap: 'round', lineJoin: 'round' }
+  ).addTo(gpsMap);
+  gpsMapPolylines.push(seg);
+}
+
+function clearMapTrace() {
+  gpsMapPolylines.forEach(p => { if (gpsMap) gpsMap.removeLayer(p); });
+  gpsMapPolylines = [];
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MODULE 17 : UI HELPERS
+// ═══════════════════════════════════════════════════════════════
+let alertTimer = null;
+
+function showAlert(type, msg, duration = 2500) {
+  const zone = document.getElementById('alert-zone');
+  zone.innerHTML = `<div class="alert-banner ${type}">
+    <span class="alert-icon">${type === 'danger' ? '🔴' : type === 'warning' ? '🟠' : 'ℹ️'}</span>
+    <span>${msg}</span>
+  </div>`;
+  clearTimeout(alertTimer);
+  alertTimer = setTimeout(() => { zone.innerHTML = ''; }, duration);
+}
+
+function addEvent(type, title, sub) {
+  const list = document.getElementById('events-list');
+  const empty = list.querySelector('.empty-state');
+  if (empty) list.innerHTML = '';
+
+  const time = new Date().toLocaleTimeString('fr', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const icon = type === 'accel' ? '⚡' : type === 'brake' ? '🛑' : '✅';
+
+  const el = document.createElement('div');
+  el.className = 'event-item';
+  el.innerHTML = `
+    <div class="event-icon ${type}">${icon}</div>
+    <div class="event-text">
+      <div class="event-title">${title}</div>
+      <div class="event-sub">${sub}</div>
+    </div>
+    <div class="event-time">${time}</div>
+  `;
+  list.insertBefore(el, list.firstChild);
+  while (list.children.length > 20) list.removeChild(list.lastChild);
+}
+
+function clearEvents() {
+  document.getElementById('events-list').innerHTML = `
+    <div class="empty-state">
+      <div class="empty-icon">📋</div>
+      <div class="empty-text">Les événements de conduite apparaîtront ici</div>
+    </div>`;
+}
+
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t, i) => {
+    const panels = ['live', 'trip', 'ref', 'settings'];
+    t.className = 'tab' + (panels[i] === name ? ' active' : '');
+  });
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('panel-' + name)?.classList.add('active');
+
+  if (name === 'trip') renderTripCharts();
+  if (name === 'ref') { renderReferencePanel(); renderTripsList(); }
+}
+
+function renderReferencePanel() {
+  const el = document.getElementById('ref-content');
+  const ref = STATE.referenceTrip;
+  if (!ref) {
+    el.innerHTML = `<div class="empty-state">
+      <div class="empty-icon">🗺</div>
+      <div class="empty-text">Aucun trajet de référence.<br>Complète un trajet et sauvegarde-le.</div>
+    </div>`;
+    return;
+  }
+
+  const d = new Date(ref.date);
+  const dateStr = d.toLocaleDateString('fr', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+  const dur = Math.round(ref.stats.duration / 60000);
+  const g = getGrade(ref.stats.score);
+
+  el.innerHTML = `
+    <div class="ref-card">
+      <div class="ref-header">
+        <div class="ref-title">${dateStr}</div>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <div class="ref-badge">Référence</div>
+          <button class="btn btn-secondary btn-small" onclick="exportTrip('ref')">JSON</button>
+        </div>
+      </div>
+      <div class="ref-stats">
+        <div class="ref-stat">
+          <div class="ref-stat-val" style="color:${g.color}">${ref.stats.score}</div>
+          <div class="ref-stat-lbl">Score</div>
+        </div>
+        <div class="ref-stat">
+          <div class="ref-stat-val">${ref.stats.distance.toFixed(1)}</div>
+          <div class="ref-stat-lbl">km</div>
+        </div>
+        <div class="ref-stat">
+          <div class="ref-stat-val">${dur}</div>
+          <div class="ref-stat-lbl">min</div>
+        </div>
+      </div>
+    </div>
+    <div class="ref-card" style="margin-top:12px">
+      <div class="ref-header"><div class="ref-title">Zones problématiques</div></div>
+      ${ref.zones.length === 0
+        ? '<p style="font-size:14px;color:var(--text2)">Aucune zone détectée — trajet exemplaire !</p>'
+        : ref.zones.map(z => `
+          <div class="event-item" style="padding:10px 0;border-bottom:1px solid var(--border)">
+            <div class="event-icon ${z.type}">${z.type === 'brake' ? '🛑' : '⚡'}</div>
+            <div class="event-text">
+              <div class="event-title">${z.type === 'brake' ? 'Freinage fort' : 'Accélération brusque'}</div>
+              <div class="event-sub">${z.count} fois · ${z.avgAcc.toFixed(2)} m/s² moy.</div>
+            </div>
+          </div>`).join('')
+      }
+    </div>`;
+}
+
+function renderTripsList() {
+  const el = document.getElementById('trips-list');
+  if (!STATE.trips.length) {
+    el.innerHTML = `<div class="empty-state">
+      <div class="empty-icon">🕓</div>
+      <div class="empty-text">Les trajets terminés apparaîtront ici</div>
+    </div>`;
+    return;
+  }
+
+  el.innerHTML = STATE.trips.map(t => {
+    const d = new Date(t.date);
+    const dateStr = d.toLocaleDateString('fr', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+    const g = getGrade(t.stats.score);
+    return `
+      <div class="trip-row">
+        <div class="trip-info">
+          <div class="trip-date">${dateStr}</div>
+          <div class="trip-sub">
+            <span style="color:${g.color};font-weight:600">${t.stats.score} (${g.grade})</span>
+            · ${t.stats.distance.toFixed(1)} km
+            · ${t.stats.accelEvents + t.stats.brakeEvents} évts
+          </div>
+        </div>
+        <div class="trip-actions">
+          <button class="btn btn-secondary btn-small" onclick="setTripAsReference('${t.id}')">Réf</button>
+          <button class="btn btn-secondary btn-small" onclick="exportTrip('${t.id}')">JSON</button>
+          <button class="btn btn-secondary btn-small" onclick="deleteTrip('${t.id}')">🗑</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MODULE 18 : RÉGLAGES (clampés + persistés)
+// ═══════════════════════════════════════════════════════════════
+function updateThreshold(type, val) {
+  const v = clamp(val / 100,
+    type === 'accel' ? LIMITS.ACCEL_THRESHOLD_MIN : LIMITS.BRAKE_THRESHOLD_MIN, 0.8);
+  if (type === 'accel') {
+    CONFIG.ACCEL_THRESHOLD = v;
+    document.getElementById('thresh-accel-label').textContent = v.toFixed(2) + ' m/s² (min 0.15)';
+    document.getElementById('gauge-thresh').textContent = '±' + v.toFixed(2);
+  } else {
+    CONFIG.BRAKE_THRESHOLD = v;
+    document.getElementById('thresh-brake-label').textContent = v.toFixed(2) + ' m/s² (min 0.15)';
+  }
+  persistSettings();
+}
+
+function updateSilence(val) {
+  CONFIG.EVENT_SILENCE_MS = Math.max(LIMITS.EVENT_SILENCE_MIN_MS, val * 100);
+  document.getElementById('silence-label').textContent =
+    (CONFIG.EVENT_SILENCE_MS / 1000).toFixed(1) + ' s entre événements';
+  persistSettings();
+}
+
+function updateKalman(param, val) {
+  if (param === 'Q') {
+    CONFIG.KALMAN_Q_PER_S = val / 1000;
+    document.getElementById('kalman-q-label').textContent = CONFIG.KALMAN_Q_PER_S.toFixed(3);
+  } else {
+    CONFIG.KALMAN_R_BASE = val / 100;
+    document.getElementById('kalman-r-label').textContent = CONFIG.KALMAN_R_BASE.toFixed(2);
+  }
+  persistSettings();
+}
+
+function toggleSetting(key) {
+  STATE.settings[key] = !STATE.settings[key];
+  document.getElementById('toggle-' + key).className = 'toggle' + (STATE.settings[key] ? ' on' : '');
+  if (key === 'wakelock') {
+    STATE.settings.wakelock && STATE.sessionActive ? acquireWakeLock() : releaseWakeLock();
+  }
+  persistSettings();
+}
+
+function persistSettings() {
+  try {
+    localStorage.setItem(LS.SETTINGS, JSON.stringify({
+      accelThreshold: CONFIG.ACCEL_THRESHOLD,
+      brakeThreshold: CONFIG.BRAKE_THRESHOLD,
+      silenceMs: CONFIG.EVENT_SILENCE_MS,
+      kalmanQ: CONFIG.KALMAN_Q_PER_S,
+      kalmanR: CONFIG.KALMAN_R_BASE,
+      toggles: STATE.settings,
+    }));
+  } catch (e) {}
+}
+
+function loadSettings() {
+  try {
+    const s = JSON.parse(localStorage.getItem(LS.SETTINGS));
+    if (!s) return;
+    CONFIG.ACCEL_THRESHOLD = clamp(s.accelThreshold || 0.3, LIMITS.ACCEL_THRESHOLD_MIN, 0.8);
+    CONFIG.BRAKE_THRESHOLD = clamp(s.brakeThreshold || 0.3, LIMITS.BRAKE_THRESHOLD_MIN, 0.8);
+    CONFIG.EVENT_SILENCE_MS = Math.max(LIMITS.EVENT_SILENCE_MIN_MS, s.silenceMs || 2000);
+    CONFIG.KALMAN_Q_PER_S = s.kalmanQ || 0.05;
+    CONFIG.KALMAN_R_BASE = s.kalmanR || 0.5;
+    if (s.toggles) Object.assign(STATE.settings, s.toggles);
+
+    // synchroniser l'UI des réglages
+    document.getElementById('thresh-accel').value = Math.round(CONFIG.ACCEL_THRESHOLD * 100);
+    document.getElementById('thresh-accel-label').textContent = CONFIG.ACCEL_THRESHOLD.toFixed(2) + ' m/s² (min 0.15)';
+    document.getElementById('gauge-thresh').textContent = '±' + CONFIG.ACCEL_THRESHOLD.toFixed(2);
+    document.getElementById('thresh-brake').value = Math.round(CONFIG.BRAKE_THRESHOLD * 100);
+    document.getElementById('thresh-brake-label').textContent = CONFIG.BRAKE_THRESHOLD.toFixed(2) + ' m/s² (min 0.15)';
+    document.getElementById('silence-window').value = Math.round(CONFIG.EVENT_SILENCE_MS / 100);
+    document.getElementById('silence-label').textContent = (CONFIG.EVENT_SILENCE_MS / 1000).toFixed(1) + ' s entre événements';
+    document.getElementById('kalman-q').value = Math.round(CONFIG.KALMAN_Q_PER_S * 1000);
+    document.getElementById('kalman-q-label').textContent = CONFIG.KALMAN_Q_PER_S.toFixed(3);
+    document.getElementById('kalman-r').value = Math.round(CONFIG.KALMAN_R_BASE * 100);
+    document.getElementById('kalman-r-label').textContent = CONFIG.KALMAN_R_BASE.toFixed(2);
+    for (const key of ['haptic', 'anticipation', 'wakelock']) {
+      document.getElementById('toggle-' + key).className = 'toggle' + (STATE.settings[key] ? ' on' : '');
+    }
+  } catch (e) {}
+}
+
+// ═══════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════
+function init() {
+  loadSettings();
+
+  try {
+    const saved = JSON.parse(localStorage.getItem(LS.CALIB));
+    if (saved?.matrix?.forward && saved?.matrix?.up) {
+      STATE.calibMatrix = saved.matrix;
+      STATE.refineCount = saved.refineCount || 0;
+      STATE.calibrated = true;
+      document.getElementById('refine-sub').textContent =
+        STATE.refineCount > 0 ? `Axe affiné ${STATE.refineCount} fois via GPS` : 'Calibration statique seule';
+    }
+  } catch (e) {}
+
+  try {
+    const ref = JSON.parse(localStorage.getItem(LS.REF));
+    if (ref) STATE.referenceTrip = ref;
+  } catch (e) {}
+
+  try {
+    const trips = JSON.parse(localStorage.getItem(LS.TRIPS));
+    if (Array.isArray(trips)) STATE.trips = trips;
+  } catch (e) {}
+
+  const needsPermScreen = typeof DeviceMotionEvent !== 'undefined' &&
+                          typeof DeviceMotionEvent.requestPermission === 'function';
+
+  if (needsPermScreen) {
+    document.getElementById('permission-screen').style.display = 'flex';
+  } else {
+    // Desktop / Android : pas de requestPermission explicite
+    document.getElementById('permission-screen').style.display = 'none';
+    STATE.permissionsGranted = true;
+    if (STATE.calibrated) {
+      startAllSensors();
+    } else if (typeof DeviceMotionEvent !== 'undefined') {
+      showCalibration();
+    } else {
+      // Pas de capteurs du tout (desktop) : GPS + UI seulement
+      startGPS();
+      startUILoop();
+      initMap();
+    }
+  }
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
